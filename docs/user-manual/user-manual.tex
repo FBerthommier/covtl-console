@@ -85,6 +85,14 @@ live automatically whenever a bridge is reachable on port 8421.
 \item \textbf{Click the chip} \emph{EN $\cdot$ this is easy for us}. The
   console previews it immediately: the \emph{Preview stack} on the right
   fills with three rows --- G2P, Enriched, Final SAMPA (Figure~\ref{fig:preview}).
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{../screenshots/preview-stack.png}
+\caption{The preview stack on the worked example: G2P output, the
+enriched string, and the final SAMPA the engine will receive --- guard
+checked, nothing synthesized yet.}
+\label{fig:preview}
+\end{figure}
 \item \textbf{Press \key{S}} (or click \emph{Synthesize from preview}).
   A progress strip runs G2P $\rightarrow$ trajectory $\rightarrow$ VTL
   $\rightarrow$ WAV; a few seconds later the result summary appears
