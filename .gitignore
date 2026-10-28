@@ -1,0 +1,31 @@
+# Build artifacts and local run outputs — never commit
+out/
+server_run.log
+*.log
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Synthesis / video artifacts
+*.wav
+*.mp4
+*.tract
+*.polar
+*.speaker
+temp_video/
+
+# Local environments
+.venv/
+venv/
+node_modules/
+
+# LaTeX build intermediates (PDFs under docs/ ARE committed)
+docs/**/*.aux
+docs/**/*.log
+docs/**/*.out
+docs/**/*.toc
+docs/**/*.synctex.gz
+
+# OS cruft
+Thumbs.db
+.DS_Store
