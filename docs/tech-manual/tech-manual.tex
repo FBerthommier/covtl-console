@@ -1,0 +1,375 @@
+% SPDX-FileCopyrightText: 2026 Frédéric Berthommier
+% SPDX-License-Identifier: GPL-3.0-or-later
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{longtable}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\parskip}{0.45em}
+\setlength{\parindent}{0pt}
+\newcommand{\key}[1]{\textbf{#1}}
+\newcommand{\utie}{\texttildelow}   % the engine's coda-fusion marker (U+203F)
+
+\title{COVTL Lab Console --- Technical Reference\\[4pt]\large Bridge API, anchor instrumentation, clocks, caching, extension guide}
+\author{Fr\'ed\'eric Berthommier}
+\date{October 2026 --- console v3 (bridge 3.0.0), engine covtl-pipeline v1.1.0}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\vspace{1em}
+
+\section{Architecture}
+
+Three tiers, all local:
+
+\begin{verbatim}
+ browser UI (ES modules, no build step)
+   |  fetch JSON over http, 30 s timeout, no-cache
+ FastAPI bridge  (server.py, 127.0.0.1:8421)
+   |  in-process import, one Pipeline per job on a thread
+ covtl-pipeline  (vtl_synth)  ->  VocalTractLab 2.4 natives
+\end{verbatim}
+
+The Python engine is the single source of truth for every phonetic
+decision; the browser only previews, displays and controls. When
+\texttt{vtl\_synth} is not importable, the bridge answers
+\texttt{/api/status} with \texttt{backend:"mock"} and every
+engine-dependent endpoint returns a structured 503; the UI then runs its
+browser demo engine (\texttt{js/demo-engine.js}) --- same interface,
+approximate behavior, labeled as demo.
+
+\subsection{Module map (\texttt{js/})}
+
+\begin{longtable}{p{0.24\linewidth}p{0.70\linewidth}}
+\texttt{data.js} & Engine constants mirrored client-side: inventory,
+suggestion table, per-language examples, keyboard map, demo lexicons,
+polar targets. \\
+\texttt{demo-engine.js} & Offline simulation: \texttt{demoG2P},
+\texttt{demoTimeline}, \texttt{demoF0}, \texttt{demoAudio} (formant-tone
+synthesis + WAV encoding), \texttt{demoCompile},
+\texttt{demoSegmentPayload}, \texttt{demoSynthesize}. \\
+\texttt{render.js} & DOM renderers: token strips, guard banner,
+progress, result summary, downloads, examples, history; \texttt{\$},
+\texttt{\$\$}, \texttt{el}, \texttt{toast}, \texttt{log}. \\
+\texttt{api.js} & Transport (\texttt{jfetch} with 30\,s abort), the
+\texttt{api} facade, client-side caches, demo$\rightarrow$live cache
+clearing (\texttt{clearDemoCaches}), \texttt{normalizePolar}. \\
+\texttt{polar.js} & \texttt{PolarStage}: the continuous display ---
+layered canvases, dual clocks, anchor stepping. \\
+\texttt{spectrogram.js} & \texttt{SpectrogramView}: FFT spectrogram;
+\texttt{setSource} accepts the anchor list for the overlay. \\
+\texttt{compiler.js} & \texttt{SyllableCompiler} panel +
+\texttt{stretchLabel}/\texttt{segmentLabel}. \\
+\texttt{app.js} & Controller: state machine, flows (preview / compile /
+synthesize / playback), transport wiring, keyboard, settings
+(\texttt{covtl.settings.v3}), history (\texttt{covtl.history.v1}). \\
+\end{longtable}
+
+\section{The bridge API}
+
+All bodies are JSON. Errors use one structured envelope everywhere
+(v1-compatible \texttt{detail} plus a v2 error object):
+
+\begin{verbatim}
+{ "detail": "<message>",
+  "error": { "class": "SampaGuardError", "message": "...",
+             "hint": "...", "symbols": [ {symbol, position,
+                                          reason, suggestions} ] } }
+\end{verbatim}
+
+\subsection{Endpoints}
+
+\begin{longtable}{p{0.30\linewidth}p{0.64\linewidth}}
+\textbf{GET /api/status} & Identity + caches: \texttt{backend}
+(\texttt{live|mock}), \texttt{engine:"vtl-synth"}, \texttt{version},
+\texttt{bridge:"3.0.0"}, speakers, languages, defaults, cache counters
+(preview/compile/synth entries + hits), jobs, inventory digest,
+\texttt{out\_root} (absolute). When live: \texttt{active}
+\{speaker, lang\} and lexicon sizes. \\
+\textbf{GET /api/health} & \texttt{status} in
+\texttt{ok|degraded|offline}, \texttt{engine\_version},
+\texttt{active\_speaker}, \texttt{active\_lang},
+\texttt{registry\_warnings} (speaker probe failures, absent lexicons). \\
+\textbf{GET /api/languages} & Six entries
+\texttt{\{id, name, prosody\_profile, lexicon\_present\}} + the active
+language. \\
+\textbf{GET /api/speakers?lang=} & Registry
+\texttt{\{id, label, f0\_default, verified\_with\_lang, active\}};
+\texttt{warning\_when\_unverified} is set for non-English languages
+(vowels calibrated on \texttt{jd3} only); \texttt{calibration\_speaker}
+is \texttt{jd3}. \\
+\textbf{POST /api/preview} & Request
+\texttt{\{text?, sampa?, mode: ortho|phonetic, lang, expressive,
+policy?\}}. One round trip for the whole preview stack: response
+\texttt{\{g2p\_string, enriched\_string, final\_sampa, words[], groups[],
+warnings[], tokens[], rejected\_symbols[], language, lexicon,
+inventory\_digest, cache\}}. Passing \texttt{sampa} re-enriches an edited
+G2P string; phonetic mode runs the guard only. LRU(128); repeats answer
+\texttt{cache:true}. \\
+\textbf{POST /api/preview/sampa} & Guard-only tokenization:
+\texttt{\{tokens, rejected\}}. (Deprecated v1 \texttt{/api/preview/g2p}
+still works, forwarding to the unified preview.) \\
+\textbf{POST /api/compile} & Request
+\texttt{\{text, lang, timings, guard\_policy, expressive\}}. Runs the
+engine's anchor walk with \emph{no synthesis}: response carries
+\texttt{anchors[], blocks[], nodes[], metrics\{anchors, segments, blocks,
+syllables, clusters, consonants, vowels, steps, duration\_s\}},
+\texttt{segments\_preview[]} (per anchor pair: label, chronological
+\texttt{stretch} with the \utie{} coda marker, cons/vowel, kinds, n\_steps),
+per-phoneme \texttt{targets\{rho, theta, category\}}, rejected symbols,
+warnings. Guard \texttt{error} + rejected $\Rightarrow$ 422
+\texttt{SampaGuardError}. LRU(64). \\
+\textbf{POST /api/synthesize} & Request (superset):
+\texttt{\{text, mode, lang, speaker, expressive, f0, timings, engine,
+ortho, outputMode: audio|sagittal|polar, guardPolicy, outputDir, label,
+exports\}}. Guard \texttt{error} is validated \emph{before} any job
+starts ($\Rightarrow$ 422). Response \texttt{\{job\_id, cached, echo\}};
+\texttt{echo} repeats the full resolved parameter set (the log line).
+Cache hit requires state \texttt{done} + all artifacts on disk. \\
+\textbf{GET /api/job/\{id\}} & Job payload: \texttt{state}
+(\texttt{queued|running|cancelling|done|error|cancelled}), \texttt{stage}
+(\texttt{g2p|trajectory|vtl|wav|video}), \texttt{progress},
+\texttt{polar\_ready}, \texttt{wav\_ready}, \texttt{anchors[]},
+\texttt{block\_count}, \texttt{duration\_s}, \texttt{echo},
+\texttt{result\{sampa, warnings, duration, frames, phrases, files[],
+wav\_url\}}, error fields. \\
+\textbf{GET /api/job/\{id\}/polar} & Segment payload (below). \\
+\textbf{POST /api/job/\{id\}/cancel} & \texttt{queued} jobs become
+\texttt{cancelled} immediately; \texttt{running} jobs flip to
+\texttt{cancelling} (result discarded at the next checkpoint). \\
+\textbf{GET /api/job/\{id\}/files/\{name\}} & \texttt{FileResponse} for
+any artifact registered on the job. \\
+\end{longtable}
+
+\subsection{The segment payload}
+
+\begin{verbatim}
+{ job_id, segment_count, from, rho_max, duration_s, sample_rate: 100,
+  anchors:  [ { i, t, kind, label, long, breath, hold, word_end, pt } ],
+  segments: [ { segment_index, t0, t1, anchor_from, anchor_to,
+                label_from, label_to, blocks[...], markers{...},
+                points: [ { t, rho_v, theta_v, rho_c, theta_c } ] } ] }
+\end{verbatim}
+
+Points run at 100\,Hz; null channels mark an inactive branch
+(the consonantal branch is null outside clusters). \texttt{theta} arrives
+pre-converted to the display convention and \texttt{rho} normalized over
+the job's radius range, so the browser never re-derives engine units.
+
+\section{Anchor-timing instrumentation}
+
+\subsection{Instrumented replay}
+
+The bridge never re-implements the walk. Inside
+\texttt{vtl\_synth.core.syltraj.build\_phrase\_pval}, the engine's
+\texttt{build\_global\_pval} iterates over consecutive anchor pairs;
+every appended block constructs a \texttt{SylBlock}, and every iteration
+calls \texttt{\_collect\_consonants} exactly once (after the possible
+departure plateau). \texttt{server.\_instrumented\_phrase\_build} hooks
+\emph{both} --- the same monkeypatch idiom as
+\texttt{vtl\_synth.video.polar\_video.\_recorded\_build\_pval}:
+
+\begin{itemize}
+\item a \texttt{RecBlock} subclass records construction order into a
+  ledger;
+\item a wrapped \texttt{\_collect\_consonants} records the ledger length
+  at each anchor-pair iteration.
+\end{itemize}
+
+Anchor $k$'s step position is the cumulative block step count at
+iteration $k$, minus that iteration's departure plateau (a plateau at the
+slice tail belongs to the \emph{next} iteration --- iterations never emit
+plateaus after their hook). The terminal anchor is the total step count.
+
+\subsection{Drift checks}
+
+Two hard invariants raise \texttt{StructureDrift} (HTTP 500) instead of
+guessing: recorded blocks == engine blocks, and iteration count ==
+\texttt{len(anchors)}$-$1. If the engine's walk ever changes shape, the
+bridge fails loudly.
+
+\subsection{Start-early and the \texttt{.polar} mapping}
+
+The synthesis worker builds the trajectory structure \emph{first}
+(cheap, pure Python): \texttt{structure\_compile} for anchors/blocks,
+then the engine's own \texttt{build\_polar}/\texttt{write\_polar} with
+the same parameters the engine will use --- the \texttt{.polar} content
+is byte-identical to what \texttt{Pipeline.run(polar=True)} writes.
+\texttt{polar\_ready} flips \emph{before} the VTL stage starts; if the
+early stage fails, the display waits for the engine's own export and the
+job carries a note.
+
+\texttt{.polar} format v4 is JSON at 100\,Hz:
+\texttt{trajectory.vocalic|consonantal.\{rho, theta\}} in
+\emph{trigonometric radians} (0 East, CCW), \texttt{phonemes[]} with
+$t_0/t_1$ spans and category, \texttt{inventory[]}. The bridge converts
+for display when serving the segment payload:
+
+\begin{verbatim}
+theta_display = (90 - degrees(theta_trig)) mod 360   # 0 = top, clockwise
+rho_norm      = rho / rho_max ,  rho_max = max(1.45, inventory rhos)
+\end{verbatim}
+
+\section{Clock model}
+
+\begin{itemize}
+\item \textbf{Polar-only mode.} From \texttt{polar\_ready} until the
+  audio is attached, \texttt{PolarStage} advances on its own monotonic
+  clock (performance timestamps), scaled by the speed selector.
+\item \textbf{Audio mastery.} Once the WAV is ready and playing, the
+  audio element is master: the loop reads \texttt{audio.currentTime}
+  (read-only) each tick. The handoff at block boundaries goes through
+  \texttt{\_pendingAudioSync} so the head never jumps.
+\item \textbf{Autoplay fallback.} If the browser refuses autoplay, the
+  own clock keeps the display alive; the audio takes over on its
+  \texttt{play} event (the first user gesture on \emph{Play} unlocks it).
+\item \textbf{Replay.} When the audio runs to its end, the display
+  replays from 0 on its own clock.
+\item \textbf{Background-tab watchdog.} \texttt{requestAnimationFrame}
+  freezes in hidden tabs; a 50\,ms interval watchdog advances the loop
+  whenever rAF stalls ($>$120\,ms), so start-early works even when the
+  console tab is hidden. Rendering resumes on focus.
+\end{itemize}
+
+\section{Caching}
+
+\begin{longtable}{p{0.22\linewidth}p{0.40\linewidth}p{0.30\linewidth}}
+ & \textbf{Key} & \textbf{Capacity / notes} \\
+Preview LRU & (text, sampa, mode, lang, expressive) & 128; hits answer
+\texttt{cache:true} \\
+Compile LRU & (text, lang, timings JSON) & 64; same \texttt{cache} flag \\
+Synthesis & SHA-1 over the resolved parameter set \emph{including the
+engine version} & 32; hit requires \texttt{done} + artifacts on disk \\
+\end{longtable}
+
+The synthesis key \emph{excludes} \texttt{guardPolicy} deliberately:
+\texttt{warn}/\texttt{off} yield identical audio, and the
+\texttt{error} policy is re-validated on every request (fresh or cached)
+so a cached job can never bypass the guard. Including the engine version
+invalidates entries across engine upgrades instead of serving old-engine
+audio.
+
+Client side, \texttt{api.js} keeps mirrors for instant UI replay;
+\texttt{clearDemoCaches()} wipes them when the probe flips
+demo$\rightarrow$live so simulated results never leak into live mode.
+
+\section{Front-end state machine and WYSIWYG paths}
+
+\begin{longtable}{p{0.26\linewidth}p{0.68\linewidth}}
+\texttt{empty} & start / after clearing input. \\
+\texttt{preview-ready} & a preview with no rejected symbols. \\
+\texttt{guard-warn} & rejected symbols under policy \texttt{warn};
+synthesis relabeled ``Synthesize anyway (N dropped)''. \\
+\texttt{guard-error} & rejected symbols under policy \texttt{error};
+synthesis blocked. \\
+\texttt{synthesizing} & job running (stage strip + progress bar). \\
+\texttt{polar-running} & start-early: polar display alive while the WAV
+renders. \\
+\texttt{ready} & job done, artifacts available. \\
+\texttt{playing} & playback in progress. \\
+\texttt{backend-offline} & probe failing; demo fallback offered. \\
+\end{longtable}
+
+A v3 rule: \emph{late preview responses can never downgrade a running
+job} --- \texttt{setPreviewState} only transitions from preview states
+(\texttt{empty}, \texttt{preview-ready}, \texttt{guard-*},
+\texttt{backend-offline}). Stale responses are dropped by a sequence
+counter (\texttt{previewSeq}); the compiler has the same guard for
+in-flight compiles.
+
+\textbf{WYSIWYG synthesis.} Three paths, one promise --- the string you
+see is the string you hear:
+\begin{enumerate}
+\item \emph{deterministic-ortho}: \key{S} uses the previewed final SAMPA
+  (the same G2P callable the engine's \texttt{Pipeline.run} uses);
+\item \emph{phonetic / edited}: \key{E} (or phonetic mode) sends exactly
+  the edited string (\texttt{use\_g2p=False} semantics);
+\item \emph{compiler-edited}: ``Use in phonetic input'' pushes the
+  compiled string to the stage, previewed, then synthesized.
+\end{enumerate}
+
+\section{The single-file bundler}
+
+\texttt{build\_standalone.py} inlines the ES modules into
+\texttt{covtl-console-standalone.html} with a purely textual transform:
+each module becomes an IIFE factory registered in a \texttt{\_\_mods}
+registry; \texttt{import \{a, b as c\} from './m.js'} becomes
+\texttt{const \{a, b: c\} = \_\_mods.m}; \texttt{export const/function/
+class} are rewritten to plain declarations and the factory returns the
+exported names. Order is fixed (data first, app last).
+
+Two caveats worth knowing:
+\begin{itemize}
+\item the export-name scanner accepts \texttt{\$} in identifiers
+  (regex \texttt{[A-Za-z\_\$][\textbackslash w\$]*}) --- names like
+  \texttt{\$} and \texttt{\$\$} from \texttt{render.js} must survive the
+  rewrite or the bundle breaks at runtime (this bit v2; fixed);
+\item the injected preamble installs \texttt{window.onerror} and an
+  \texttt{unhandledrejection} hook that write the failure into
+  \texttt{document.title}, because \texttt{file://} pages show no
+  console.
+\end{itemize}
+
+The build is rebuildable at any time
+(\texttt{python build\_standalone.py}); \texttt{tests/} verify the
+bundle compiles (\texttt{node --check}), registers all 8 modules, keeps
+no ES-module imports and carries the per-language example labels.
+
+\section{Known environment quirks}
+
+\begin{itemize}
+\item \textbf{Embedded-browser loopback latency.} Requests from a
+  webview-style browser to 127.0.0.1 can take seconds even when
+  \texttt{curl} answers in milliseconds. The client timeout is therefore
+  30\,000\,ms (\texttt{api.js}), and every button relabels to its
+  in-flight state so slow requests are never silent.
+\item \textbf{Server warm-up is synchronous.} The first G2P call loads
+  lexicons and rules (seconds on a cold start). \texttt{\_\_main\_\_}
+  runs the warm-up \emph{before} uvicorn starts; a thread-at-import
+  version deadlocked uvicorn's event loop on per-module import locks
+  (observed), so the \texttt{startup} event variant only covers
+  \texttt{uvicorn server:app}, where imports are complete when the loop
+  starts.
+\item \textbf{No-cache asset policy.} \texttt{/}, \texttt{*.js},
+  \texttt{*.css}, \texttt{*.html} are served with
+  \texttt{Cache-Control: no-cache} --- a stale cached \texttt{app.js}
+  once hid new features entirely.
+\item \textbf{Port discipline.} The bridge binds \texttt{127.0.0.1:8421}
+  only; the v2 workbench's 8420 is untouched and both can run side by
+  side.
+\item \textbf{Shared origin state.} Settings live in
+  \texttt{localStorage} (\texttt{covtl.settings.v3}); two consoles on
+  the same origin and port share them --- expected when v3 replaces v2
+  at the same port, surprising when testing both at once.
+\end{itemize}
+
+\section{Extension guide}
+
+\paragraph{Add a language example.} Append to \texttt{EXAMPLES} in
+\texttt{js/data.js}: \texttt{\{label, text, mode, lang\}}. The chip row,
+the standalone bundle and the tests' bundle check all derive from it
+(rebuild the standalone). Nothing server-side changes.
+
+\paragraph{Add a panel.} Follow the compiler pattern: a root element in
+\texttt{index.html} (or one your module creates), a class in its own
+\texttt{js/} file exporting the panel, wiring in \texttt{app.js}, CSS
+tokens from \texttt{css/app.css}. Add the module to
+\texttt{build\_standalone.py}'s \texttt{ORDER} (dependency order, data
+first, app last).
+
+\paragraph{Add an endpoint.} Extend \texttt{server.py}: a Pydantic
+request model, the route, and structured errors via
+\texttt{api\_error}/\texttt{guard\_error}. Keep the v2 envelope. If the
+endpoint produces artifacts, register them in \texttt{job["paths"]} so
+\texttt{/api/job/\{id\}/files/\{name\}} serves them, and respect the
+\texttt{exports} flag for what is \emph{offered} versus kept for the
+display.
+
+\paragraph{The acceptance rule.} Whatever you add, the brief's
+acceptance rule binds the display to the engine's answer:
+\emph{block boundaries shown = the anchor list returned by the engine}.
+Never re-segment in the browser; if the engine's walk changes shape, let
+\texttt{StructureDrift} fail loudly rather than guessing.
+
+\end{document}
