@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 Frédéric Berthommier -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # COVTL Lab Console — local laboratory interface for covtl-pipeline
 
 The COVTL Lab Console is a **local web interface** for the open-source

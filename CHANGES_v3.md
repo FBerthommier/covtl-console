@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 Frédéric Berthommier -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # COVTL Console v3 — Change Record
 
 Scope: implement the COVTL Lab Console design brief (October 2026, 40 pp.)

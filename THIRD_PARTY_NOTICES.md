@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 Frédéric Berthommier -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Third-party notices
 
 covtl-console is licensed GPL-3.0-or-later (see [LICENSE](LICENSE)).
