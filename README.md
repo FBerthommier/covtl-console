@@ -231,7 +231,8 @@ another speaker with a non-English language triggers the console's
 | `P` | Preview (never synthesizes) | `0–3` | Speed 0.25× / 0.5× / 1× / 2× |
 | `S` | Synthesize from current source | `E` | Synthesize from edited SAMPA |
 | `C` | Focus the compiler (Enter compiles) | `D` | Downloads menu |
-| `Esc` | Cancel synthesis / stop playback | `?` | Shortcut help |
+| `R` | Reset the input: clears **both** panes and the whole preview chain (drafts, preview, edited SAMPA, guard results) | `Esc` | Cancel synthesis / stop playback |
+| `?` | Shortcut help | | |
 
 ## Documentation
 

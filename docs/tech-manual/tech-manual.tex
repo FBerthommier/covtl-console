@@ -278,6 +278,18 @@ job} --- \texttt{setPreviewState} only transitions from preview states
 counter (\texttt{previewSeq}); the compiler has the same guard for
 in-flight compiles.
 
+\paragraph{Input reset (\texttt{resetInputs}, key \texttt{R}).} One
+action clears both source panes and the whole preview chain: drafts,
+\texttt{preview}, \texttt{editedSampa}, \texttt{sampaTokens},
+\texttt{sampaRejected}, plus the editor widget and guard banner. It also
+bumps \texttt{previewSeq} (an in-flight preview response is dropped by
+the same stale-guard) and cancels the debounced auto-preview timer, so
+no late response can repopulate the cleared stack. Settings persist
+(minus the cleared sources); language, speaker, timings, results,
+history and the display state are untouched. This exists because stale
+chain state leaked across input modes --- an \emph{edited} SAMPA kept
+steering synthesis after a pane switch (observed).
+
 \textbf{WYSIWYG synthesis.} Three paths, one promise --- the string you
 see is the string you hear:
 \begin{enumerate}
