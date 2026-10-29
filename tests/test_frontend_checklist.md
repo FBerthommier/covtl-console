@@ -38,9 +38,16 @@ must read **live**.
       both panes, drops the edited badge, hides the editor, empties the
       preview stack and returns the state chip to *Empty* — no stale
       edited SAMPA can steer a later synthesis.
+- [ ] **Reset reaches the downstream panels**: after a preview + compile
+      + synthesis, one reset empties the compiler field and its tiles /
+      chips / cards (restored placeholders), stops playback, clears the
+      polar display, the spectrogram, the scrub ticks, the result
+      summary and the downloads menu; the state chip reads *Empty* even
+      from the post-synthesis *Ready* state; a running synthesis is
+      cancelled.
 - [ ] After a reset, a fresh preview works immediately (no cache of the
-      old chain); language, speaker, timings, results and history are
-      untouched by the reset.
+      old chain); language, speaker, timings and history are untouched
+      by the reset.
 
 ## Compiler (step 2)
 

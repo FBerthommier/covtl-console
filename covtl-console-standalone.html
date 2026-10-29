@@ -670,7 +670,7 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
           <span id="input-count" class="dim mono">0 / 2000 chars</span>
           <span id="draft-note" class="dim">phonetic draft kept</span>
           <label class="field-row small"><input type="checkbox" id="auto-preview" checked> auto-preview on word end</label>
-          <button class="btn btn-xs" id="btn-reset-input" data-tip="Clear BOTH input panes and the whole preview chain — drafts, preview stack, edited SAMPA, guard results — so the two input modes cannot interfere through stale state. Language, speaker, timings and results are untouched. Keyboard: R">Reset input <kbd class="mini">R</kbd></button>
+          <button class="btn btn-xs" id="btn-reset-input" data-tip="Clear BOTH input panes, the whole preview chain (drafts, preview stack, edited SAMPA, guard results), the syllable compiler panel and the acoustic synthesis results (playback, polar display, spectrogram, downloads). A running synthesis is cancelled. Language, speaker, timings and history are untouched. Keyboard: R">Reset input <kbd class="mini">R</kbd></button>
         </div>
         <div id="examples" class="chips-row"></div>
         <p class="hint">Preview fires when you finish a unit — space, punctuation, <span class="mono">. | %</span> —
@@ -1285,7 +1285,7 @@ const KEYBOARD_SHORTCUTS = [
   { keys: ['E'], action: 'Synthesize from the edited SAMPA' },
   { keys: ['C'], action: 'Focus the syllable compiler (Enter compiles)' },
   { keys: ['D'], action: 'Downloads menu' },
-  { keys: ['R'], action: 'Reset the input — clears both panes and the whole preview chain' },
+  { keys: ['R'], action: 'Reset the input — clears both panes, the preview chain, the compiler panel and the synthesis results' },
   { keys: ['Esc'], action: 'Cancel synthesis · stop playback · close help' },
   { keys: ['?'], action: 'Show this shortcut reference' },
 ];
@@ -3165,6 +3165,22 @@ class SpectrogramView {
     img.src = pngUrl;
   }
 
+  /* back to the empty state — used by the input reset */
+  clear() {
+    this.duration = 0;
+    this.segments = [];
+    this.f0Curve = null;
+    this.anchors = [];
+    this.pngImg = null;
+    this.frames = 0;
+    this.mag = null;
+    this.cursorT = -1;
+    for (const c of [this.spec, this.overlay]) {
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+    }
+  }
+
   /* ── layout ── */
   _layout() {
     const w = this.container.clientWidth || 900;
@@ -3536,6 +3552,31 @@ class SyllableCompiler {
 
   setInput(text) {
     if (document.activeElement !== this.input) this.input.value = text;
+  }
+
+  /* back to the pristine panel — used by the input reset (key R): clears
+   * the field, the tiles, the block sequence, the cards and every note,
+   * and invalidates any in-flight compile response */
+  reset() {
+    clearTimeout(this._autoTimer);
+    this._seq = (this._seq || 0) + 1;        // stale responses must not land
+    this.result = null;
+    this.selected = -1;
+    this.userEdited = false;
+    this._lastAuto = null;
+    this.input.value = '';
+    this.tiles.innerHTML = '';
+    this.blockString.innerHTML = '';
+    this.blockString.append(el('span', { class: 'dim', text: 'compile to see the block sequence' }));
+    this.canvas.innerHTML = '';
+    this.canvas.append(el('div', { class: 'dim compiler-empty', id: 'compiler-empty' },
+      'No compiled structure yet — type syllable blocks (or take a preset) and press Compile. ',
+      el('br'), 'The engine answers with its real anchors, blocks and per-phoneme polar targets.'));
+    this._error(null);
+    this.resultNote.style.display = 'none';
+    this.resultNote.innerHTML = '';
+    const link = document.getElementById('compiler-link-note');
+    if (link) link.textContent = '';
   }
 
   /* step 2 follows step 1: compile the pipeline's final SAMPA (debounced,
@@ -3919,7 +3960,7 @@ function buildHelp() {
       row('E', 'Synthesize from the edited SAMPA'),
       row('C', 'Focus the syllable compiler (Enter compiles)'),
       row('D', 'Downloads menu'),
-      row('R', 'Reset the input — clears both panes and the whole preview chain (drafts, preview, edited SAMPA, guard results)'),
+      row('R', 'Reset the input — clears both panes, the preview chain, the compiler panel and the synthesis results (a running synthesis is cancelled)'),
       row('Esc', 'Cancel a running synthesis / stop playback'),
       row('?', 'This overlay')),
     R.el('h3', { text: 'New in v3' }),
@@ -4311,16 +4352,24 @@ function finalSampaOf() {
 /* ═══════════════════════ input reset ═══════════════════════ */
 /* One action clears BOTH input panes (orthographic + phonetic) and every
  * state of the preview chain: drafts, preview stack, edited SAMPA, guard
- * results. Without it, stale state leaks across modes — an edited SAMPA
- * keeps steering synthesis after you switch panes, and an ortho draft
- * blocks a fresh phonetic start (observed: typing "ba da ga" ortho-wise
- * stuck the chain at the G2P's "ba.da" while a previously edited SAMPA
- * silently kept steering). Language, speaker, timings, results, history
- * and the display are untouched. */
+ * results — plus the downstream surfaces built on that chain: the syllable
+ * compiler panel and the acoustic synthesis results (playback, polar
+ * display, spectrogram, result summary, downloads). Without it, stale
+ * state leaks across modes — an edited SAMPA keeps steering synthesis
+ * after you switch panes, a compiler plan from the previous string stays
+ * on screen, an old audio keeps playing (observed: typing "ba da ga"
+ * ortho-wise stuck the chain at the G2P's "ba.da" while a previously
+ * edited SAMPA silently kept steering). Language, speaker, timings and
+ * history are untouched. */
 function resetInputs() {
   clearTimeout(convertTimer);
   convertTimer = null;
   previewSeq++;                        // any in-flight preview response is dropped
+  // a running synthesis is built on the chain being cleared — cancel it
+  if (state.job.running) {
+    state.job.cancel.cancelled = true;
+    R.log('reset: running synthesis cancelled');
+  }
   state.sources = { ortho: '', phonetic: '' };
   state.lastPreviewed = null;
   state.preview = null;
@@ -4332,10 +4381,35 @@ function resetInputs() {
   $('#sampa-edit-wrap').style.display = 'none';
   $('#g2p-words').innerHTML = '';
   $('#preview-status').textContent = '';
-  renderPreviewStack();                // empty → placeholders, state 'empty'
+  // compiler panel back to its pristine placeholders
+  compiler?.reset();
+  // acoustic synthesis results: stop playback, detach audio, clear displays
+  stopPlayback();
+  state.polar = null;
+  state.result = null;
+  polarStage?.detachAudio();
+  polarStage?.setPayload(null);
+  const audio = $('#audio-el');
+  try { audio.pause(); audio.removeAttribute('src'); audio.load(); } catch { /* noop */ }
+  spec?.clear();
+  $('#result-summary').innerHTML = '';
+  $('#job-strip').style.display = 'none';
+  $('#seg-badge').style.display = 'none';
+  $('#dl-menu').style.display = 'none';
+  buildScrubTicks();
+  $('#polar-block').textContent = '—';
+  $('#polar-anchor').textContent = '—';
+  $('#polar-readout').textContent = 'ρ/θ —';
+  $('#polar-time').textContent = '0.00 / 0.00 s';
+  $('#polar-status').textContent = 'idle';
+  renderPreviewStack();                // empty → placeholders
+  setAppState('empty');                // explicit reset overrides the
+                                       // no-downgrade rule (that rule
+                                       // protects against LATE PREVIEW
+                                       // responses, not user actions)
   updateCounters();
   saveSettings();
-  R.log('input reset — both panes and the preview chain cleared (R)');
+  R.log('input reset — both panes, compiler panel and synthesis results cleared (R)');
 }
 
 /* ═══════════════════════ preview flow ═══════════════════════ */

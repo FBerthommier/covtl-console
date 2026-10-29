@@ -103,6 +103,22 @@ export class SpectrogramView {
     img.src = pngUrl;
   }
 
+  /* back to the empty state — used by the input reset */
+  clear() {
+    this.duration = 0;
+    this.segments = [];
+    this.f0Curve = null;
+    this.anchors = [];
+    this.pngImg = null;
+    this.frames = 0;
+    this.mag = null;
+    this.cursorT = -1;
+    for (const c of [this.spec, this.overlay]) {
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+    }
+  }
+
   /* ── layout ── */
   _layout() {
     const w = this.container.clientWidth || 900;

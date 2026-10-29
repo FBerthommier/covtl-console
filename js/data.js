@@ -306,7 +306,7 @@ export const KEYBOARD_SHORTCUTS = [
   { keys: ['E'], action: 'Synthesize from the edited SAMPA' },
   { keys: ['C'], action: 'Focus the syllable compiler (Enter compiles)' },
   { keys: ['D'], action: 'Downloads menu' },
-  { keys: ['R'], action: 'Reset the input — clears both panes and the whole preview chain' },
+  { keys: ['R'], action: 'Reset the input — clears both panes, the preview chain, the compiler panel and the synthesis results' },
   { keys: ['Esc'], action: 'Cancel synthesis · stop playback · close help' },
   { keys: ['?'], action: 'Show this shortcut reference' },
 ];

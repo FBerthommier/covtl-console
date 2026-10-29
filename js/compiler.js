@@ -194,6 +194,31 @@ export class SyllableCompiler {
     if (document.activeElement !== this.input) this.input.value = text;
   }
 
+  /* back to the pristine panel — used by the input reset (key R): clears
+   * the field, the tiles, the block sequence, the cards and every note,
+   * and invalidates any in-flight compile response */
+  reset() {
+    clearTimeout(this._autoTimer);
+    this._seq = (this._seq || 0) + 1;        // stale responses must not land
+    this.result = null;
+    this.selected = -1;
+    this.userEdited = false;
+    this._lastAuto = null;
+    this.input.value = '';
+    this.tiles.innerHTML = '';
+    this.blockString.innerHTML = '';
+    this.blockString.append(el('span', { class: 'dim', text: 'compile to see the block sequence' }));
+    this.canvas.innerHTML = '';
+    this.canvas.append(el('div', { class: 'dim compiler-empty', id: 'compiler-empty' },
+      'No compiled structure yet — type syllable blocks (or take a preset) and press Compile. ',
+      el('br'), 'The engine answers with its real anchors, blocks and per-phoneme polar targets.'));
+    this._error(null);
+    this.resultNote.style.display = 'none';
+    this.resultNote.innerHTML = '';
+    const link = document.getElementById('compiler-link-note');
+    if (link) link.textContent = '';
+  }
+
   /* step 2 follows step 1: compile the pipeline's final SAMPA (debounced,
    * cached). A string typed by hand is respected — we only note that the
    * panel has detached from the preview. */
