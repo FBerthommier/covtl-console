@@ -65,12 +65,13 @@ kbd.mini.inverse { color: #0e1319; background: var(--accent-cyan); border-color:
 
 #app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-/* ── tooltips (data-tip) ─────────────────────────────────────────── */
+/* ── tooltips (data-tip) — short single-line hints only ──────────── */
 [data-tip] { position: relative; }
 [data-tip]:hover::after {
   content: attr(data-tip);
   position: absolute; bottom: calc(100% + 6px); left: 8px; z-index: 90;
-  max-width: 340px; padding: 6px 8px; white-space: normal;
+  max-width: 240px; padding: 4px 7px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
   background: #0b0e12; border: 1px solid var(--line); border-radius: var(--radius-c);
   color: var(--ink-muted); font-size: 11.5px; line-height: 1.4;
   box-shadow: 0 4px 14px rgba(0,0,0,.5); pointer-events: none;
@@ -616,12 +617,12 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
     </div>
     <div class="hdr-chips">
       <span class="state-chip" id="state-chip" data-state="empty">Empty</span>
-      <button class="chip" id="chip-lang" data-tip="Active language — click to focus the selector">EN — English</button>
-      <button class="chip" id="chip-speaker" data-tip="Active speaker and base f0 — click to focus the selector">jd3 · f0 102.2 Hz</button>
-      <button class="chip chip-status" id="chip-backend" data-tip="Backend health — click for the full /api/health payload">
+      <button class="chip" id="chip-lang">EN — English</button>
+      <button class="chip" id="chip-speaker">jd3 · f0 102.2 Hz</button>
+      <button class="chip chip-status" id="chip-backend">
         <span class="dot" id="backend-dot"></span><span id="backend-label">connecting…</span>
       </button>
-      <span class="chip busy-pill" id="busy-pill" style="display:none" data-tip="Requests currently in flight — the console is waiting on the bridge">⏳ …</span>
+      <span class="chip busy-pill" id="busy-pill" style="display:none">⏳ …</span>
     </div>
     <div class="hdr-right">
       <span class="ver mono">console v3 · covtl-pipeline v1.1.0</span>
@@ -646,8 +647,7 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
           <select id="sel-lang"></select></label>
         <label class="field"><span>Speaker</span>
           <select id="sel-speaker"></select></label>
-        <div id="speaker-warn" class="badge-warn" style="display:none"
-             data-tip="The language pack's vowel targets are calibrated in situ on jd3 only; this speaker keeps its native vowel targets.">
+        <div id="speaker-warn" class="badge-warn" style="display:none">
              ⚠ Unverified combination: language-pack vowels are calibrated on jd3 only.</div>
         <div class="field-row small">
           <label class="field"><span>Base f0 (Hz)</span>
@@ -670,7 +670,7 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
           <span id="input-count" class="dim mono">0 / 2000 chars</span>
           <span id="draft-note" class="dim">phonetic draft kept</span>
           <label class="field-row small"><input type="checkbox" id="auto-preview" checked> auto-preview on word end</label>
-          <button class="btn btn-xs" id="btn-reset-input" data-tip="Clear BOTH input panes, the whole preview chain (drafts, preview stack, edited SAMPA, guard results), the syllable compiler panel and the acoustic synthesis results (playback, polar display, spectrogram, downloads). A running synthesis is cancelled. Language, speaker, timings and history are untouched. Keyboard: R">Reset input <kbd class="mini">R</kbd></button>
+          <button class="btn btn-xs" id="btn-reset-input">Reset input <kbd class="mini">R</kbd></button>
         </div>
         <div id="examples" class="chips-row"></div>
         <p class="hint">Preview fires when you finish a unit — space, punctuation, <span class="mono">. | %</span> —
@@ -783,7 +783,7 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
           <label class="field"><span>Label</span><input type="text" id="out-label" placeholder="auto" class="mono"></label>
         </div>
         <div class="under-row">
-          <span class="dim mono" id="out-resolved" data-tip="Absolute folder where this bridge writes the job artifacts — shown so 'out' is never a mystery.">artifacts → …</span>
+          <span class="dim mono" id="out-resolved">artifacts → …</span>
         </div>
         <p class="hint">MP4 (sagittal or dual-panel polar) is produced on request and offered in the
           transport's <strong>Downloads menu</strong> — it is not displayed inline in v3 (the brief
@@ -864,8 +864,8 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
           <span class="fg-step"><b>3 · Synthesize</b> uses the compiled SAMPA → audio + polar trajectory — <em>hear exactly what you inspected</em></span>
         </div>
         <div class="actionbar">
-          <button class="btn" id="btn-preview" data-tip="Answers: WHAT will the engine receive? Runs text → G2P → prosodic markers → SAMPA guard and shows the exact final string (red = rejected). Cheap, cached, auto-runs while typing — and never makes sound.">Preview the engine's input <kbd class="mini inverse">P</kbd></button>
-          <button class="btn btn-primary btn-lg" id="btn-synth" data-tip="Uses the PREVIEWED/COMPILED SAMPA — the exact string you inspected above. Disabled until a preview exists: everything is visible before synthesis runs.">Synthesize from preview <kbd class="mini inverse">S</kbd></button>
+          <button class="btn" id="btn-preview">Preview the engine's input <kbd class="mini inverse">P</kbd></button>
+          <button class="btn btn-primary btn-lg" id="btn-synth">Synthesize from preview <kbd class="mini inverse">S</kbd></button>
           <button class="btn" id="btn-synth-edit" disabled>Synthesize from edited SAMPA <kbd class="mini inverse">E</kbd></button>
           <button class="btn btn-danger" id="btn-cancel" style="display:none">Cancel <kbd class="mini inverse">Esc</kbd></button>
         </div>
@@ -2085,7 +2085,7 @@ function renderHistory(items, onRestore) {
   if (!items.length) { box.append(el('div', { class: 'dim', text: 'No syntheses yet in this session.' })); return; }
   for (const h of items.slice(0, 14)) {
     box.append(el('div', {
-      class: 'history-item', 'data-tip': h.sampa.slice(0, 120), onclick: () => onRestore(h),
+      class: 'history-item', 'data-tip': h.sampa.slice(0, 60), onclick: () => onRestore(h),
     },
       el('span', { class: 'hist-time', text: h.time }),
       el('span', { class: 'hist-text', text: h.text.slice(0, 46) }),
@@ -3456,7 +3456,6 @@ class SyllableCompiler {
       el('span', { class: 'head-gap' }),
       el('span', { class: 'compiler-src-note mono', id: 'compiler-src-note' }),
       el('button', { class: 'btn btn-primary', id: 'btn-compile',
-        'data-tip': 'Answers: HOW will the engine articulate it? Decomposes the SAMPA string into the real articulation plan — anchors, blocks, gesture durations, (ρ, θ) targets — as tiles, chips and clickable cards. No sound, no job. Step 2 of 3: Preview (what string) → Compile (what plan) → Synthesize (what sound).',
         title: 'Decompose into the engine’s anchor/block structure (no synthesis)',
         onclick: () => this.compile() }, 'Compile structure', el('kbd', { class: 'mini inverse', text: 'C' })));
 
@@ -3526,7 +3525,7 @@ class SyllableCompiler {
         this.canvas,
         el('div', { class: 'compiler-actions' },
           el('button', { class: 'btn btn-sm', id: 'btn-compiler-send', text: 'Use in phonetic input →',
-            'data-tip': 'Send the compiled string to the phonetic source and preview it', onclick: () => this._send() }),
+            'data-tip': 'Send to the phonetic input', onclick: () => this._send() }),
           el('span', { class: 'dim', id: 'compiler-link-note' })),
       ));
     return this.rootEl;

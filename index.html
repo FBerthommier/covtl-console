@@ -30,12 +30,12 @@
     </div>
     <div class="hdr-chips">
       <span class="state-chip" id="state-chip" data-state="empty">Empty</span>
-      <button class="chip" id="chip-lang" data-tip="Active language — click to focus the selector">EN — English</button>
-      <button class="chip" id="chip-speaker" data-tip="Active speaker and base f0 — click to focus the selector">jd3 · f0 102.2 Hz</button>
-      <button class="chip chip-status" id="chip-backend" data-tip="Backend health — click for the full /api/health payload">
+      <button class="chip" id="chip-lang">EN — English</button>
+      <button class="chip" id="chip-speaker">jd3 · f0 102.2 Hz</button>
+      <button class="chip chip-status" id="chip-backend">
         <span class="dot" id="backend-dot"></span><span id="backend-label">connecting…</span>
       </button>
-      <span class="chip busy-pill" id="busy-pill" style="display:none" data-tip="Requests currently in flight — the console is waiting on the bridge">⏳ …</span>
+      <span class="chip busy-pill" id="busy-pill" style="display:none">⏳ …</span>
     </div>
     <div class="hdr-right">
       <span class="ver mono">console v3 · covtl-pipeline v1.1.0</span>
@@ -60,8 +60,7 @@
           <select id="sel-lang"></select></label>
         <label class="field"><span>Speaker</span>
           <select id="sel-speaker"></select></label>
-        <div id="speaker-warn" class="badge-warn" style="display:none"
-             data-tip="The language pack's vowel targets are calibrated in situ on jd3 only; this speaker keeps its native vowel targets.">
+        <div id="speaker-warn" class="badge-warn" style="display:none">
              ⚠ Unverified combination: language-pack vowels are calibrated on jd3 only.</div>
         <div class="field-row small">
           <label class="field"><span>Base f0 (Hz)</span>
@@ -84,7 +83,7 @@
           <span id="input-count" class="dim mono">0 / 2000 chars</span>
           <span id="draft-note" class="dim">phonetic draft kept</span>
           <label class="field-row small"><input type="checkbox" id="auto-preview" checked> auto-preview on word end</label>
-          <button class="btn btn-xs" id="btn-reset-input" data-tip="Clear BOTH input panes, the whole preview chain (drafts, preview stack, edited SAMPA, guard results), the syllable compiler panel and the acoustic synthesis results (playback, polar display, spectrogram, downloads). A running synthesis is cancelled. Language, speaker, timings and history are untouched. Keyboard: R">Reset input <kbd class="mini">R</kbd></button>
+          <button class="btn btn-xs" id="btn-reset-input">Reset input <kbd class="mini">R</kbd></button>
         </div>
         <div id="examples" class="chips-row"></div>
         <p class="hint">Preview fires when you finish a unit — space, punctuation, <span class="mono">. | %</span> —
@@ -197,7 +196,7 @@
           <label class="field"><span>Label</span><input type="text" id="out-label" placeholder="auto" class="mono"></label>
         </div>
         <div class="under-row">
-          <span class="dim mono" id="out-resolved" data-tip="Absolute folder where this bridge writes the job artifacts — shown so 'out' is never a mystery.">artifacts → …</span>
+          <span class="dim mono" id="out-resolved">artifacts → …</span>
         </div>
         <p class="hint">MP4 (sagittal or dual-panel polar) is produced on request and offered in the
           transport's <strong>Downloads menu</strong> — it is not displayed inline in v3 (the brief
@@ -278,8 +277,8 @@
           <span class="fg-step"><b>3 · Synthesize</b> uses the compiled SAMPA → audio + polar trajectory — <em>hear exactly what you inspected</em></span>
         </div>
         <div class="actionbar">
-          <button class="btn" id="btn-preview" data-tip="Answers: WHAT will the engine receive? Runs text → G2P → prosodic markers → SAMPA guard and shows the exact final string (red = rejected). Cheap, cached, auto-runs while typing — and never makes sound.">Preview the engine's input <kbd class="mini inverse">P</kbd></button>
-          <button class="btn btn-primary btn-lg" id="btn-synth" data-tip="Uses the PREVIEWED/COMPILED SAMPA — the exact string you inspected above. Disabled until a preview exists: everything is visible before synthesis runs.">Synthesize from preview <kbd class="mini inverse">S</kbd></button>
+          <button class="btn" id="btn-preview">Preview the engine's input <kbd class="mini inverse">P</kbd></button>
+          <button class="btn btn-primary btn-lg" id="btn-synth">Synthesize from preview <kbd class="mini inverse">S</kbd></button>
           <button class="btn" id="btn-synth-edit" disabled>Synthesize from edited SAMPA <kbd class="mini inverse">E</kbd></button>
           <button class="btn btn-danger" id="btn-cancel" style="display:none">Cancel <kbd class="mini inverse">Esc</kbd></button>
         </div>

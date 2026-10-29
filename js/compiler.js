@@ -96,7 +96,6 @@ export class SyllableCompiler {
       el('span', { class: 'head-gap' }),
       el('span', { class: 'compiler-src-note mono', id: 'compiler-src-note' }),
       el('button', { class: 'btn btn-primary', id: 'btn-compile',
-        'data-tip': 'Answers: HOW will the engine articulate it? Decomposes the SAMPA string into the real articulation plan — anchors, blocks, gesture durations, (ρ, θ) targets — as tiles, chips and clickable cards. No sound, no job. Step 2 of 3: Preview (what string) → Compile (what plan) → Synthesize (what sound).',
         title: 'Decompose into the engine’s anchor/block structure (no synthesis)',
         onclick: () => this.compile() }, 'Compile structure', el('kbd', { class: 'mini inverse', text: 'C' })));
 
@@ -166,7 +165,7 @@ export class SyllableCompiler {
         this.canvas,
         el('div', { class: 'compiler-actions' },
           el('button', { class: 'btn btn-sm', id: 'btn-compiler-send', text: 'Use in phonetic input →',
-            'data-tip': 'Send the compiled string to the phonetic source and preview it', onclick: () => this._send() }),
+            'data-tip': 'Send to the phonetic input', onclick: () => this._send() }),
           el('span', { class: 'dim', id: 'compiler-link-note' })),
       ));
     return this.rootEl;

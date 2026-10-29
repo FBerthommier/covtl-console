@@ -201,7 +201,7 @@ export function renderHistory(items, onRestore) {
   if (!items.length) { box.append(el('div', { class: 'dim', text: 'No syntheses yet in this session.' })); return; }
   for (const h of items.slice(0, 14)) {
     box.append(el('div', {
-      class: 'history-item', 'data-tip': h.sampa.slice(0, 120), onclick: () => onRestore(h),
+      class: 'history-item', 'data-tip': h.sampa.slice(0, 60), onclick: () => onRestore(h),
     },
       el('span', { class: 'hist-time', text: h.time }),
       el('span', { class: 'hist-text', text: h.text.slice(0, 46) }),
