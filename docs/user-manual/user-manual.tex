@@ -395,8 +395,10 @@ cancels. \\
 The two input modes interfere (an old edited SAMPA keeps steering, or a
 fresh start behaves oddly) & Press \key{R} (or the \emph{Reset input}
 button): it clears \emph{both} panes and the whole preview chain ---
-drafts, preview stack, edited SAMPA, guard results --- while keeping
-your language, speaker, timings and results. \\
+drafts, preview stack, edited SAMPA, guard results --- \emph{and} the
+surfaces built on them: the compiler panel and the synthesis results
+(playback, polar display, spectrogram, downloads; a running synthesis
+is cancelled). Your language, speaker, timings and history are kept. \\
 Polar display freezes in a background tab & Expected: browsers throttle
 background tabs; the clock catches up (watchdog), rendering resumes on
 focus. \\
@@ -410,7 +412,7 @@ focus. \\
 \key{P} & preview (no sound) & \key{0}--\key{3} & speed 0.25/0.5/1/2$\times$ \\
 \key{S} & synthesize current & \key{E} & synthesize edited SAMPA \\
 \key{C} & focus compiler & \key{D} & downloads menu \\
-\key{R} & reset the input (both panes + preview chain) & \key{Esc} & cancel / stop \\
+\key{R} & reset the input (panes, chain, compiler, results) & \key{Esc} & cancel / stop \\
 \key{?} & shortcut help & & \\
 \end{longtable}
 
