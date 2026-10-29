@@ -241,6 +241,11 @@ another speaker with a non-English language triggers the console's
   caching, extension guide):
   [docs/tech-manual/tech-manual.pdf](docs/tech-manual/tech-manual.pdf)
 - Change record for v3: [CHANGES_v3.md](CHANGES_v3.md)
+- **Conformity certificate COVCONF-3SRC-3706f0c0** — three-source comparison
+  audit (arXiv:2307.02299 / covtl-pipeline / covtl-console), the complete
+  audit chain re-executed at the frozen versions: **37/37 checks conform**
+  (2026-10-29); complements COVCONF-D11-511cf2e. See
+  [docs/certificates/](docs/certificates/).
 
 ## Testing
 
