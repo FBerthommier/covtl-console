@@ -670,6 +670,7 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
           <span id="input-count" class="dim mono">0 / 2000 chars</span>
           <span id="draft-note" class="dim">phonetic draft kept</span>
           <label class="field-row small"><input type="checkbox" id="auto-preview" checked> auto-preview on word end</label>
+          <button class="btn btn-xs" id="btn-reset-input" data-tip="Clear BOTH input panes and the whole preview chain — drafts, preview stack, edited SAMPA, guard results — so the two input modes cannot interfere through stale state. Language, speaker, timings and results are untouched. Keyboard: R">Reset input <kbd class="mini">R</kbd></button>
         </div>
         <div id="examples" class="chips-row"></div>
         <p class="hint">Preview fires when you finish a unit — space, punctuation, <span class="mono">. | %</span> —
@@ -1274,14 +1275,18 @@ const EXAMPLES = [
 ];
 
 const KEYBOARD_SHORTCUTS = [
-  { keys: ['Ctrl', 'P'], action: 'Preview — G2P + enrichment + guard (never synthesizes)' },
-  { keys: ['Ctrl', 'Enter'], action: 'Synthesize (blocked when the guard policy is error)' },
-  { keys: ['Space'], action: 'Play / Pause (outside text fields)' },
+  { keys: ['Space', 'K'], action: 'Play / Pause (outside text fields)' },
+  { keys: ['Shift', 'S'], action: 'Stop playback (back to start)' },
+  { keys: ['[', ']'], action: 'Previous / next anchor' },
+  { keys: ['L'], action: 'Loop the current block' },
+  { keys: ['0', '1', '2', '3'], action: 'Speed 0.25× / 0.5× / 1× / 2×' },
+  { keys: ['P'], action: 'Preview — G2P + enrichment + guard (never synthesizes)' },
+  { keys: ['S'], action: 'Synthesize from the current source' },
+  { keys: ['E'], action: 'Synthesize from the edited SAMPA' },
+  { keys: ['C'], action: 'Focus the syllable compiler (Enter compiles)' },
+  { keys: ['D'], action: 'Downloads menu' },
+  { keys: ['R'], action: 'Reset the input — clears both panes and the whole preview chain' },
   { keys: ['Esc'], action: 'Cancel synthesis · stop playback · close help' },
-  { keys: ['Ctrl', 'K'], action: 'Focus the input text area' },
-  { keys: ['Ctrl', 'E'], action: 'Focus the SAMPA editor (Step D)' },
-  { keys: ['Ctrl', 'S'], action: 'Download the latest synthesized WAV' },
-  { keys: ['Ctrl', '1'], action: 'Focus input · G2P · enriched string' },
   { keys: ['?'], action: 'Show this shortcut reference' },
 ];
 
@@ -3914,6 +3919,7 @@ function buildHelp() {
       row('E', 'Synthesize from the edited SAMPA'),
       row('C', 'Focus the syllable compiler (Enter compiles)'),
       row('D', 'Downloads menu'),
+      row('R', 'Reset the input — clears both panes and the whole preview chain (drafts, preview, edited SAMPA, guard results)'),
       row('Esc', 'Cancel a running synthesis / stop playback'),
       row('?', 'This overlay')),
     R.el('h3', { text: 'New in v3' }),
@@ -4052,6 +4058,7 @@ function bindControls() {
     updateDerived();
     saveSettings();
   });
+  $('#btn-reset-input').addEventListener('click', resetInputs);
 
   $('#chk-expressive').addEventListener('change', (e) => {
     state.expressive = e.target.checked;
@@ -4299,6 +4306,36 @@ function setPreviewState(s) {
 
 function finalSampaOf() {
   return state.editedSampa ?? state.preview?.final ?? '';
+}
+
+/* ═══════════════════════ input reset ═══════════════════════ */
+/* One action clears BOTH input panes (orthographic + phonetic) and every
+ * state of the preview chain: drafts, preview stack, edited SAMPA, guard
+ * results. Without it, stale state leaks across modes — an edited SAMPA
+ * keeps steering synthesis after you switch panes, and an ortho draft
+ * blocks a fresh phonetic start (observed: typing "ba da ga" ortho-wise
+ * stuck the chain at the G2P's "ba.da" while a previously edited SAMPA
+ * silently kept steering). Language, speaker, timings, results, history
+ * and the display are untouched. */
+function resetInputs() {
+  clearTimeout(convertTimer);
+  convertTimer = null;
+  previewSeq++;                        // any in-flight preview response is dropped
+  state.sources = { ortho: '', phonetic: '' };
+  state.lastPreviewed = null;
+  state.preview = null;
+  state.editedSampa = null;
+  state.sampaTokens = [];
+  state.sampaRejected = [];
+  $('#text-input').value = '';
+  $('#phonetic-input').value = '';
+  $('#sampa-edit-wrap').style.display = 'none';
+  $('#g2p-words').innerHTML = '';
+  $('#preview-status').textContent = '';
+  renderPreviewStack();                // empty → placeholders, state 'empty'
+  updateCounters();
+  saveSettings();
+  R.log('input reset — both panes and the preview chain cleared (R)');
 }
 
 /* ═══════════════════════ preview flow ═══════════════════════ */
@@ -4914,6 +4951,7 @@ function bindShortcuts() {
       case '2': setSpeed('1'); break;
       case '3': setSpeed('2'); break;
       case 'd': case 'D': $('#btn-downloads').click(); break;
+      case 'r': case 'R': e.preventDefault(); resetInputs(); break;
       case '?': $('#help-overlay').style.display = ''; break;
       default: break;
     }

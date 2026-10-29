@@ -154,6 +154,7 @@ function buildHelp() {
       row('E', 'Synthesize from the edited SAMPA'),
       row('C', 'Focus the syllable compiler (Enter compiles)'),
       row('D', 'Downloads menu'),
+      row('R', 'Reset the input — clears both panes and the whole preview chain (drafts, preview, edited SAMPA, guard results)'),
       row('Esc', 'Cancel a running synthesis / stop playback'),
       row('?', 'This overlay')),
     R.el('h3', { text: 'New in v3' }),
@@ -292,6 +293,7 @@ function bindControls() {
     updateDerived();
     saveSettings();
   });
+  $('#btn-reset-input').addEventListener('click', resetInputs);
 
   $('#chk-expressive').addEventListener('change', (e) => {
     state.expressive = e.target.checked;
@@ -539,6 +541,36 @@ function setPreviewState(s) {
 
 function finalSampaOf() {
   return state.editedSampa ?? state.preview?.final ?? '';
+}
+
+/* ═══════════════════════ input reset ═══════════════════════ */
+/* One action clears BOTH input panes (orthographic + phonetic) and every
+ * state of the preview chain: drafts, preview stack, edited SAMPA, guard
+ * results. Without it, stale state leaks across modes — an edited SAMPA
+ * keeps steering synthesis after you switch panes, and an ortho draft
+ * blocks a fresh phonetic start (observed: typing "ba da ga" ortho-wise
+ * stuck the chain at the G2P's "ba.da" while a previously edited SAMPA
+ * silently kept steering). Language, speaker, timings, results, history
+ * and the display are untouched. */
+function resetInputs() {
+  clearTimeout(convertTimer);
+  convertTimer = null;
+  previewSeq++;                        // any in-flight preview response is dropped
+  state.sources = { ortho: '', phonetic: '' };
+  state.lastPreviewed = null;
+  state.preview = null;
+  state.editedSampa = null;
+  state.sampaTokens = [];
+  state.sampaRejected = [];
+  $('#text-input').value = '';
+  $('#phonetic-input').value = '';
+  $('#sampa-edit-wrap').style.display = 'none';
+  $('#g2p-words').innerHTML = '';
+  $('#preview-status').textContent = '';
+  renderPreviewStack();                // empty → placeholders, state 'empty'
+  updateCounters();
+  saveSettings();
+  R.log('input reset — both panes and the preview chain cleared (R)');
 }
 
 /* ═══════════════════════ preview flow ═══════════════════════ */
@@ -1154,6 +1186,7 @@ function bindShortcuts() {
       case '2': setSpeed('1'); break;
       case '3': setSpeed('2'); break;
       case 'd': case 'D': $('#btn-downloads').click(); break;
+      case 'r': case 'R': e.preventDefault(); resetInputs(); break;
       case '?': $('#help-overlay').style.display = ''; break;
       default: break;
     }

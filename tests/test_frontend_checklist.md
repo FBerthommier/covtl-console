@@ -33,6 +33,14 @@ must read **live**.
 - [ ] Guard error → switch policy to `warn`: the same input relabels from
       blocking error to inline red-reject warning; suggestions offered
       (`c` → `k, s`); strip action removes the red symbols.
+- [ ] **Input reset (`R` / Reset input button)**: with an ortho draft, a
+      phonetic draft AND an edited final SAMPA active, one reset clears
+      both panes, drops the edited badge, hides the editor, empties the
+      preview stack and returns the state chip to *Empty* — no stale
+      edited SAMPA can steer a later synthesis.
+- [ ] After a reset, a fresh preview works immediately (no cache of the
+      old chain); language, speaker, timings, results and history are
+      untouched by the reset.
 
 ## Compiler (step 2)
 

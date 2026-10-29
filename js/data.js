@@ -296,13 +296,17 @@ export const EXAMPLES = [
 ];
 
 export const KEYBOARD_SHORTCUTS = [
-  { keys: ['Ctrl', 'P'], action: 'Preview — G2P + enrichment + guard (never synthesizes)' },
-  { keys: ['Ctrl', 'Enter'], action: 'Synthesize (blocked when the guard policy is error)' },
-  { keys: ['Space'], action: 'Play / Pause (outside text fields)' },
+  { keys: ['Space', 'K'], action: 'Play / Pause (outside text fields)' },
+  { keys: ['Shift', 'S'], action: 'Stop playback (back to start)' },
+  { keys: ['[', ']'], action: 'Previous / next anchor' },
+  { keys: ['L'], action: 'Loop the current block' },
+  { keys: ['0', '1', '2', '3'], action: 'Speed 0.25× / 0.5× / 1× / 2×' },
+  { keys: ['P'], action: 'Preview — G2P + enrichment + guard (never synthesizes)' },
+  { keys: ['S'], action: 'Synthesize from the current source' },
+  { keys: ['E'], action: 'Synthesize from the edited SAMPA' },
+  { keys: ['C'], action: 'Focus the syllable compiler (Enter compiles)' },
+  { keys: ['D'], action: 'Downloads menu' },
+  { keys: ['R'], action: 'Reset the input — clears both panes and the whole preview chain' },
   { keys: ['Esc'], action: 'Cancel synthesis · stop playback · close help' },
-  { keys: ['Ctrl', 'K'], action: 'Focus the input text area' },
-  { keys: ['Ctrl', 'E'], action: 'Focus the SAMPA editor (Step D)' },
-  { keys: ['Ctrl', 'S'], action: 'Download the latest synthesized WAV' },
-  { keys: ['Ctrl', '1'], action: 'Focus input · G2P · enriched string' },
   { keys: ['?'], action: 'Show this shortcut reference' },
 ];
