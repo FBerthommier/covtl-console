@@ -38,7 +38,11 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
   segments run from one anchor to the next, each carrying its 100 Hz points
   (`t, rho_v, theta_v, rho_c, theta_c`, null = inactive branch). The head
   advances block by block over the real syltraj trajectory — never a
-  UI-invented re-segmentation.
+  UI-invented re-segmentation. The consonantal excursion is a closed loop
+  attached to the vocalic path at both anchors of the pair (departure →
+  consonant targets → arrival, big.bi §2.1); as soon as the head enters it,
+  the **whole loop is drawn**, so it reads as one gesture instead of a
+  stroke truncated at the head.
 - **Start-early polar-only mode** — the bridge builds the trajectory
   structure (anchors + blocks + `.polar`) *before* the VocalTractLab stage,
   so `polar_ready` flips while the WAV still renders: the display starts on

@@ -56,7 +56,14 @@ progress, result summary, downloads, examples, history; \texttt{\$},
 \texttt{api} facade, client-side caches, demo$\rightarrow$live cache
 clearing (\texttt{clearDemoCaches}), \texttt{normalizePolar}. \\
 \texttt{polar.js} & \texttt{PolarStage}: the continuous display ---
-layered canvases, dual clocks, anchor stepping. \\
+layered canvases, dual clocks, anchor stepping. Drawing policy: the
+vocalic branch is stroked up to the head (full opacity) plus a fading
+300\,ms trail; the consonantal branch is a \emph{closed loop attached
+at both anchors of the pair} (dep $\rightarrow$ C targets $\rightarrow$
+arr) --- once the head reaches the excursion's first finite sample the
+whole run is revealed at full opacity (cached run bounds per segment),
+while nulls still break the stroke and past excursions remain
+trail-faded. \\
 \texttt{spectrogram.js} & \texttt{SpectrogramView}: FFT spectrogram;
 \texttt{setSource} accepts the anchor list for the overlay. \\
 \texttt{compiler.js} & \texttt{SyllableCompiler} panel +
