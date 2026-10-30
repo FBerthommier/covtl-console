@@ -9,7 +9,7 @@
 \newcommand{\key}[1]{\textbf{#1}}
 \newcommand{\utie}{\texttildelow}          % the engine's coda-fusion marker (U+203F)
 \newcommand{\ovs}{\textvisiblespace}       % the open-box space marker (U+2423)
-\setlength{\parskip}{0.38em}
+\setlength{\parskip}{0.34em}
 \setlength{\parindent}{0pt}
 
 \title{COVTL Lab Console --- User Manual\\[4pt]\large A laboratory bench for articulatory speech synthesis}
@@ -425,6 +425,12 @@ drafts, preview stack, edited SAMPA, guard results --- \emph{and} the
 surfaces built on them: the compiler panel and the synthesis results
 (playback, polar display, spectrogram, downloads; a running synthesis
 is cancelled). Your language, speaker, timings and history are kept. \\
+A ``$\cdot$'' stretch appears in the plan with a \emph{nasal vowel}
+warning & A hand-written nasal vowel followed by a linked vowel
+(\texttt{V\~{}.V}, e.g. \texttt{kOma~.a.le.vu}) is dropped by the
+engine's walk --- all symbols are valid so the guard cannot flag it;
+the compiler warns about it. Rephrase with a short pause (space):
+\texttt{kOma~ a.le.vu}. \\
 Polar display freezes in a background tab & Expected: browsers throttle
 background tabs; the clock catches up (watchdog), rendering resumes on
 focus. \\
