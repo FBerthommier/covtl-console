@@ -2852,8 +2852,14 @@ class PolarStage {
     const tFrom = Math.max(0, t - TRAIL_S);
 
     /* branch drawing: current segment at full opacity, previous ones
-     * inside the trail window with a fading alpha ramp (brief §6.4) */
-    const drawBranch = (rhoKey, thetaKey, color) => {
+     * inside the trail window with a fading alpha ramp (brief §6.4).
+     * The consonantal branch is special-cased (fullExcursion): its
+     * excursion is a closed loop attached to the vocalic path at BOTH
+     * anchors of the pair (dep → C targets → arr, big.bi §2.1) — once
+     * the head reaches the excursion's first sample, the WHOLE run is
+     * revealed at full opacity, so the loop reads as one gesture
+     * instead of a stroke truncated at the head. */
+    const drawBranch = (rhoKey, thetaKey, color, fullExcursion) => {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       for (let s = 0; s < segs.length; s += 1) {
@@ -2863,10 +2869,25 @@ class PolarStage {
         if (iEnd < 0) continue;
         const live = seg.t0 <= t && t < seg.t1;
         if (live) {
+          let iStop = iEnd;
+          if (fullExcursion) {
+            const rs = seg[rhoKey];
+            if (rs) {
+              if (!seg._runBounds) {
+                let first = -1, last = -1;
+                for (let i = 0; i < seg.n; i += 1) {
+                  if (Number.isFinite(rs[i])) { if (first < 0) first = i; last = i; }
+                }
+                seg._runBounds = [first, last];
+              }
+              const [first, last] = seg._runBounds;
+              if (first >= 0 && iEnd >= first) iStop = last;
+            }
+          }
           ctx.globalAlpha = 1;
           ctx.strokeStyle = color;
           ctx.lineWidth = 2;
-          this._strokeBranch(ctx, seg, 0, iEnd, rhoKey, thetaKey);
+          this._strokeBranch(ctx, seg, 0, iStop, rhoKey, thetaKey);
         }
         const i0 = Math.max(0, this._segIndexAt(seg, tFrom));
         if (iEnd > i0) {
@@ -2885,7 +2906,7 @@ class PolarStage {
       ctx.globalAlpha = 1;
     };
     drawBranch('rv', 'tv', COL.v);
-    drawBranch('rc', 'tc', COL.c);
+    drawBranch('rc', 'tc', COL.c, true);
 
     // anchor markers: reached = filled dot, next = dashed circle
     const anchors = this.payload.anchors;

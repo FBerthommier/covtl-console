@@ -68,6 +68,11 @@ must read **live**.
       the WAV still renders (**start-early**, own clock), then re-anchors
       seamlessly on the audio clock at block boundaries.
 - [ ] Polar phonetic labels include shared-target counts (`i·4` style).
+- [ ] **Consonantal excursion drawn in full**: during a cluster (e.g.
+      `bw` in `bwe.nos`), pausing the head inside the excursion shows the
+      complete blue loop — departure anchor → consonant targets →
+      landing on the arrival vowel — not a stroke truncated at the head;
+      before the excursion starts, no blue is drawn.
 - [ ] `[` / `]` step anchors exactly (head lands on the anchor tick, not
       between); the scrub bar's ticks ARE the anchors.
 - [ ] `L` loops the current block; speeds 0–3 (0.25×/0.5×/1×/2×) apply to
