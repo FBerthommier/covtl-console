@@ -36,13 +36,15 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
 
 - **Continuous polar display** — the utterance is the engine's anchor list;
   segments run from one anchor to the next, each carrying its 100 Hz points
-  (`t, rho_v, theta_v, rho_c, theta_c`, null = inactive branch). The head
-  advances block by block over the real syltraj trajectory — never a
-  UI-invented re-segmentation. The consonantal excursion is a closed loop
-  attached to the vocalic path at both anchors of the pair (departure →
-  consonant targets → arrival, big.bi §2.1); as soon as the head enters it,
-  the **whole loop is drawn**, so it reads as one gesture instead of a
-  stroke truncated at the head.
+  (`t, rho_v, theta_v, rho_c, theta_c`, null = inactive branch). The display
+  is **journey-centric**: it shows exactly one journey — the anchor pair the
+  head is traveling — as a single vocalic arc from the start anchor to the
+  end anchor, with the consonantal excursion (a closed loop attached at both
+  anchors: departure vowel → consonant targets → arrival vowel, big.bi §2.1)
+  drawn **jointly** when the journey carries a cluster. Everything else is
+  eliminated — no watermark of past journeys; the tuilage is a clean switch
+  at the anchor boundary. Reduced vowels (`@`, `6`) are figured as hollow
+  rings.
 - **Start-early polar-only mode** — the bridge builds the trajectory
   structure (anchors + blocks + `.polar`) *before* the VocalTractLab stage,
   so `polar_ready` flips while the WAV still renders: the display starts on
