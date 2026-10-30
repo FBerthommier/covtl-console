@@ -34,6 +34,8 @@ const COL = {
   head: '#E7EBF0',        // ink.high
   anchorReached: 'rgba(231,235,240,0.9)',
   anchorNext: 'rgba(232,163,61,0.85)',
+  anchorFrom: '#E0524A',  // journey ORIGIN anchor (red — where the gesture leaves)
+  anchorTo: '#3E9B6C',    // journey TARGET anchor (green — where it closes)
 };
 
 export class PolarStage {
@@ -397,28 +399,14 @@ export class PolarStage {
       ctx.globalAlpha = 1;
     }
 
-    // anchor markers: reached = filled dot (hollow ring for REDUCED
-    // vowels '@' and '6'), next = dashed circle
+    // anchor markers: past = small ink dots (hollow ring for REDUCED
+    // vowels '@' and '6'); the CURRENT journey's origin (red) and target
+    // (green) anchors are prominent, so origin vs target is never
+    // confused with the white head
     const REDUCED = new Set(['@', '6']);
     const anchors = this.payload.anchors;
     anchors.forEach((a, i) => {
-      if (a.t > t + 1e-9) {
-        if (i === blk + 1) {
-          const segN = segs[Math.min(blk, segs.length - 1)];
-          const idx = this._segIndexAt(segN, Math.min(t, segN.t1));
-          if (idx >= 0) {
-            const p = this._branchAt(segN, idx);
-            const tgt = p.rhoC !== null ? [p.rhoC, p.thetaC] : [p.rhoV, p.thetaV];
-            const [x, y] = this._xy(tgt[0], tgt[1]);
-            ctx.strokeStyle = COL.anchorNext;
-            ctx.setLineDash([3, 3]);
-            ctx.lineWidth = 1.4;
-            ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.stroke();
-            ctx.setLineDash([]);
-          }
-        }
-        return;
-      }
+      if (a.t > t + 1e-9) return;
       const segIdx = Math.max(0, i - 1);
       const segP = segs[Math.min(segIdx, segs.length - 1)];
       const idx = this._segIndexAt(segP, a.t);
@@ -517,6 +505,38 @@ export class PolarStage {
         ctx.fillStyle = COL.head;
         ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
       }
+    }
+
+    // current journey's origin and target anchors — drawn LAST (above the
+    // head) with distinct glyphs: origin = filled red dot, target = green
+    // ring with a center dot. When a journey is a stationary hold the two
+    // stack (green ring around the red dot) instead of hiding under the
+    // white head, so origin vs target is never confused.
+    if (seg) {
+      const journeyAnchor = (anchorIndex, color, isTarget) => {
+        const a = this.payload.anchors[anchorIndex];
+        if (!a) return;
+        const idx = this._segIndexAt(seg, Math.min(a.t, seg.t1));
+        if (idx < 0) return;
+        const p = this._branchAt(seg, idx);
+        const tgt = p.rhoC !== null ? [p.rhoC, p.thetaC] : [p.rhoV, p.thetaV];
+        const [x, y] = this._xy(tgt[0], tgt[1]);
+        if (isTarget) {
+          ctx.fillStyle = color;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.fillStyle = color;
+          ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(10,13,18,0.85)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.stroke();
+        }
+      };
+      journeyAnchor(seg.anchorFrom, COL.anchorFrom, false);
+      journeyAnchor(seg.anchorTo, COL.anchorTo, true);
     }
 
     this._emitTick(tickData);
