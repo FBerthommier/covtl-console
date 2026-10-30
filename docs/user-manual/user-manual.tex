@@ -9,7 +9,7 @@
 \newcommand{\key}[1]{\textbf{#1}}
 \newcommand{\utie}{\texttildelow}          % the engine's coda-fusion marker (U+203F)
 \newcommand{\ovs}{\textvisiblespace}       % the open-box space marker (U+2423)
-\setlength{\parskip}{0.45em}
+\setlength{\parskip}{0.38em}
 \setlength{\parindent}{0pt}
 
 \title{COVTL Lab Console --- User Manual\\[4pt]\large A laboratory bench for articulatory speech synthesis}
@@ -209,8 +209,8 @@ that edited string.
 \caption{The continuous polar display mid-utterance (Block 5/10, synced
 on the audio clock). Red trail: vocalic branch; blue dot and ring:
 consonantal branch; small dots: anchors reached (hollow rings: reduced
-vowels); dashed ring: next anchor; labels of the current journey at
-their phoneme targets.}
+vowels); red dot: journey ORIGIN, green ring: journey TARGET; labels of
+the current journey at their phoneme targets.}
 \label{fig:polar}
 \end{figure}
 
@@ -238,6 +238,12 @@ at the anchor boundary. Within the journey:
 \item \textbf{Reduced vowels} (\texttt{@} and \texttt{6}) are figured
   as hollow rings with a center dot --- present in the plan, distinct
   from the filled dots of full vowel targets.
+\item \textbf{Origin vs target.} The journey's two anchors are colored
+  so they can never be confused with the white head: the \textbf{origin}
+  (where the gesture leaves) is a \textbf{red dot}, the \textbf{target}
+  (where the gesture closes) is a \textbf{green ring}. On a stationary
+  hold the two stack --- the green ring wraps the red dot --- and the
+  blue excursion always reads from the red dot to the green ring.
 \end{itemize}
 
 \paragraph{Labels.} Phonetic labels appear at their target positions

@@ -44,7 +44,8 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
   drawn **jointly** when the journey carries a cluster. Everything else is
   eliminated — no watermark of past journeys; the tuilage is a clean switch
   at the anchor boundary. Reduced vowels (`@`, `6`) are figured as hollow
-  rings.
+  rings, and the journey's **origin and target anchors are colored** (red
+  dot / green ring) so they can never be confused with the white head.
 - **Start-early polar-only mode** — the bridge builds the trajectory
   structure (anchors + blocks + `.polar`) *before* the VocalTractLab stage,
   so `polar_ready` flips while the WAV still renders: the display starts on

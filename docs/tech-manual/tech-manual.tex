@@ -5,7 +5,7 @@
 \usepackage{longtable}
 \usepackage[hidelinks]{hyperref}
 
-\setlength{\parskip}{0.45em}
+\setlength{\parskip}{0.38em}
 \setlength{\parindent}{0pt}
 \newcommand{\key}[1]{\textbf{#1}}
 \newcommand{\utie}{\texttildelow}   % the engine's coda-fusion marker (U+203F)
@@ -64,7 +64,10 @@ $\rightarrow$ C targets $\rightarrow$ arr) is drawn jointly when the
 segment carries finite c samples. Everything else is eliminated --- no
 watermark of past journeys; the tuilage is a clean switch at the anchor
 boundary. Reduced-vowel anchors (\texttt{@}, \texttt{6}) are hollow
-rings; phonetic labels cover the current journey only. \\
+rings; phonetic labels cover the current journey only. The journey's
+origin anchor is a red dot and its target anchor a green ring, drawn
+above the head (stacking visibly on stationary holds), superseding the
+former amber ``next anchor'' ring. \\
 \texttt{spectrogram.js} & \texttt{SpectrogramView}: FFT spectrogram;
 \texttt{setSource} accepts the anchor list for the overlay. \\
 \texttt{compiler.js} & \texttt{SyllableCompiler} panel +
