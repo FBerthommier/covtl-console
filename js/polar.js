@@ -35,7 +35,6 @@ const COL = {
   anchorReached: 'rgba(231,235,240,0.9)',
   anchorNext: 'rgba(232,163,61,0.85)',
 };
-const TRAIL_S = 0.30;      // fading trail length (s) — brief §6.4
 
 export class PolarStage {
   /* container: element that receives the canvases + badge bar.
@@ -375,74 +374,40 @@ export class PolarStage {
       this.onBlockChange?.(blk);
     }
 
-    const tFrom = Math.max(0, t - TRAIL_S);
-
-    /* branch drawing: current segment at full opacity, previous ones
-     * inside the trail window with a fading alpha ramp (brief §6.4).
-     * The consonantal branch is special-cased (fullExcursion): its
-     * excursion is a closed loop attached to the vocalic path at BOTH
-     * anchors of the pair (dep → C targets → arr, big.bi §2.1) — once
-     * the head reaches the excursion's first sample, the WHOLE run is
-     * revealed at full opacity, so the loop reads as one gesture
-     * instead of a stroke truncated at the head. */
-    const drawBranch = (rhoKey, thetaKey, color, fullExcursion) => {
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      for (let s = 0; s < segs.length; s += 1) {
-        const seg = segs[s];
-        if (seg.t1 <= tFrom || seg.t0 > t) continue;
-        const iEnd = this._segIndexAt(seg, t);
-        if (iEnd < 0) continue;
-        const live = seg.t0 <= t && t < seg.t1;
-        if (live) {
-          let iStop = iEnd;
-          if (fullExcursion) {
-            const rs = seg[rhoKey];
-            if (rs) {
-              if (!seg._runBounds) {
-                let first = -1, last = -1;
-                for (let i = 0; i < seg.n; i += 1) {
-                  if (Number.isFinite(rs[i])) { if (first < 0) first = i; last = i; }
-                }
-                seg._runBounds = [first, last];
-              }
-              const [first, last] = seg._runBounds;
-              if (first >= 0 && iEnd >= first) iStop = last;
-            }
-          }
-          ctx.globalAlpha = 1;
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 2;
-          this._strokeBranch(ctx, seg, 0, iStop, rhoKey, thetaKey);
-        }
-        const i0 = Math.max(0, this._segIndexAt(seg, tFrom));
-        if (iEnd > i0) {
-          const nWant = Math.max(2, Math.round((seg.t[iEnd] - Math.max(tFrom, seg.t0)) * 100));
-          const stride = Math.max(1, Math.floor((iEnd - i0) / nWant * 2));
-          ctx.strokeStyle = color;
-          ctx.lineWidth = live ? 2 : 1.6;
-          for (let i = i0; i < iEnd; i += stride) {
-            const j = Math.min(iEnd, i + stride);
-            const frac = Math.max(0.05, Math.min(1, (seg.t[i] - tFrom) / TRAIL_S));
-            ctx.globalAlpha = 0.32 * frac;
-            this._strokeBranch(ctx, seg, i, j, rhoKey, thetaKey);
-          }
-        }
-      }
+    /* Journey-centric rendering (model semantics, big.bi): the display
+     * shows exactly ONE journey — the anchor pair the head is traveling.
+     * Its vocalic branch is presented as a single arc between the start
+     * anchor and the end anchor; when the journey carries a consonantal
+     * excursion (a cluster: departure vowel → C targets → arrival vowel,
+     * the departure possibly being a silent anchor for utterance-initial
+     * CV), the excursion is drawn JOINTLY with its vocalic arc. The rest
+     * is eliminated: no watermark of past journeys — the tuilage is a
+     * clean switch at the anchor boundary. The anchor skeleton (dots)
+     * stays as structural context. */
+    const seg = segs[Math.min(blk, segs.length - 1)];
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (seg) {
       ctx.globalAlpha = 1;
-    };
-    drawBranch('rv', 'tv', COL.v);
-    drawBranch('rc', 'tc', COL.c, true);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = COL.v;
+      this._strokeBranch(ctx, seg, 0, seg.n - 1, 'rv', 'tv');
+      ctx.strokeStyle = COL.c;
+      this._strokeBranch(ctx, seg, 0, seg.n - 1, 'rc', 'tc');
+      ctx.globalAlpha = 1;
+    }
 
-    // anchor markers: reached = filled dot, next = dashed circle
+    // anchor markers: reached = filled dot (hollow ring for REDUCED
+    // vowels '@' and '6'), next = dashed circle
+    const REDUCED = new Set(['@', '6']);
     const anchors = this.payload.anchors;
     anchors.forEach((a, i) => {
       if (a.t > t + 1e-9) {
         if (i === blk + 1) {
-          const seg = segs[Math.min(blk, segs.length - 1)];
-          const idx = this._segIndexAt(seg, Math.min(t, seg.t1));
+          const segN = segs[Math.min(blk, segs.length - 1)];
+          const idx = this._segIndexAt(segN, Math.min(t, segN.t1));
           if (idx >= 0) {
-            const p = this._branchAt(seg, idx);
+            const p = this._branchAt(segN, idx);
             const tgt = p.rhoC !== null ? [p.rhoC, p.thetaC] : [p.rhoV, p.thetaV];
             const [x, y] = this._xy(tgt[0], tgt[1]);
             ctx.strokeStyle = COL.anchorNext;
@@ -455,52 +420,60 @@ export class PolarStage {
         return;
       }
       const segIdx = Math.max(0, i - 1);
-      const seg = segs[Math.min(segIdx, segs.length - 1)];
-      const idx = this._segIndexAt(seg, a.t);
-      if (idx >= 0 && idx < seg.n) {
-        const p = this._branchAt(seg, idx);
+      const segP = segs[Math.min(segIdx, segs.length - 1)];
+      const idx = this._segIndexAt(segP, a.t);
+      if (idx >= 0 && idx < segP.n) {
+        const p = this._branchAt(segP, idx);
         const tgt = p.rhoC !== null ? [p.rhoC, p.thetaC] : [p.rhoV, p.thetaV];
         const [x, y] = this._xy(tgt[0], tgt[1]);
-        ctx.fillStyle = COL.anchorReached;
-        ctx.beginPath(); ctx.arc(x, y, 2.6, 0, Math.PI * 2); ctx.fill();
+        if (a.kind === 'V' && REDUCED.has(a.label)) {
+          // reduced vowel: hollow ring + center dot — present in the
+          // plan, not a full vowel target
+          ctx.strokeStyle = COL.anchorReached;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = COL.anchorReached;
+          ctx.beginPath(); ctx.arc(x, y, 1.1, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.fillStyle = COL.anchorReached;
+          ctx.beginPath(); ctx.arc(x, y, 2.6, 0, Math.PI * 2); ctx.fill();
+        }
       }
     });
 
-    // phonetic labels at target positions, for every ACTIVATED syllabic
-    // block: reached blocks render faded, the block under the head at full
-    // strength. Target positions come from the trajectory itself — the
-    // plateau sample for the vowel, each consonant's mid-sub-arc sample
-    // (where the arc peaks on the node target) — nothing is invented.
+    // phonetic labels at target positions — CURRENT JOURNEY ONLY (the
+    // rest is eliminated with its strokes). Target positions come from
+    // the trajectory itself — the plateau sample for the vowel, each
+    // consonant's mid-sub-arc sample (where the arc peaks on the node
+    // target) — nothing is invented.
     {
-      const labels = new Map();     // dedupe key → {x, y, text, active, count}
-      for (const seg of segs) {
-        if (seg.t0 > t + 1e-9) continue;           // not yet activated
-        const active = t < seg.t1 - 1e-9;
-        for (const b of seg.blocks || []) {
+      const labels = new Map();     // dedupe key → {x, y, text, count}
+      const cur = segs[Math.min(blk, segs.length - 1)];
+      if (cur) {
+        for (const b of cur.blocks || []) {
           if (b.t1 === undefined) continue;
           if (b.kind === 'plateau' && b.vowel_key) {
-            const tm = Math.min(t, (b.t0 + b.t1) / 2);
-            const idx = this._segIndexAt(seg, Math.max(seg.t0, Math.min(seg.t1, tm)));
+            const tm = (b.t0 + b.t1) / 2;
+            const idx = this._segIndexAt(cur, Math.max(cur.t0, Math.min(cur.t1, tm)));
             if (idx >= 0) {
-              const p = this._branchAt(seg, idx);
+              const p = this._branchAt(cur, idx);
               const key = 'V:' + b.vowel_key + ':' + p.rhoV.toFixed(2) + ':' + p.thetaV.toFixed(0);
               const hit = labels.get(key);
               if (hit) hit.count += 1;            // shared target — count, not hide
-              else labels.set(key, { text: b.vowel_key, cat: 'V', active, count: 1, rho: p.rhoV, theta: p.thetaV });
+              else labels.set(key, { text: b.vowel_key, cat: 'V', count: 1, rho: p.rhoV, theta: p.thetaV });
             }
           } else if (b.kind === 'cluster' && b.cons_keys && b.cons_keys.length) {
             const m = b.cons_keys.length;
             b.cons_keys.forEach((ck, k) => {
               const tmid = b.t0 + (k + 0.5) * (b.t1 - b.t0) / m;
-              if (tmid > t + 1e-9) return;         // sub-arc not reached yet
-              const idx = this._segIndexAt(seg, Math.max(seg.t0, Math.min(seg.t1, tmid)));
+              const idx = this._segIndexAt(cur, Math.max(cur.t0, Math.min(cur.t1, tmid)));
               if (idx >= 0) {
-                const p = this._branchAt(seg, idx);
+                const p = this._branchAt(cur, idx);
                 if (p.rhoC === null) return;
                 const key = 'C:' + ck + ':' + p.rhoC.toFixed(2) + ':' + p.thetaC.toFixed(0);
                 const hit = labels.get(key);
                 if (hit) hit.count += 1;
-                else labels.set(key, { text: ck, cat: 'C', active, count: 1, rho: p.rhoC, theta: p.thetaC });
+                else labels.set(key, { text: ck, cat: 'C', count: 1, rho: p.rhoC, theta: p.thetaC });
               }
             });
           }
@@ -510,7 +483,6 @@ export class PolarStage {
       for (const l of labels.values()) {
         const [x, y] = this._xy(l.rho, l.theta);
         const text = l.count > 1 ? `${l.text}·${l.count}` : l.text;
-        ctx.globalAlpha = l.active ? 0.95 : 0.4;
         ctx.font = '600 12px ui-monospace, Menlo, Consolas, monospace';
         ctx.lineWidth = 3;
         ctx.strokeStyle = 'rgba(10,13,18,0.85)';

@@ -317,6 +317,8 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
 .sw-con { background: var(--branch-c); border-radius: 50%; }
 .dot-anchor { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-high); display: inline-block; }
 .ring-anchor { width: 7px; height: 7px; border-radius: 50%; border: 1.5px dashed var(--accent-amber); display: inline-block; }
+.dot-reduced { width: 7px; height: 7px; border-radius: 50%; border: 1.2px solid var(--ink-high); display: inline-block; position: relative; }
+.dot-reduced::after { content: ''; position: absolute; inset: 2px; border-radius: 50%; background: var(--ink-high); }
 
 /* action bar */
 .flow-guide {
