@@ -188,6 +188,26 @@ def local_rejected(sampa: str) -> List[Dict[str, Any]]:
                             for t in tokenize(sampa) if t["kind"] == "rejected"])
 
 
+_NASAL_LINK_RE = re.compile(r"[aeiouyEO@269]~[.\-]?[aeiouyEO@269]")
+_NASAL_LINK_WARNING = (
+    "nasal vowel followed by a linked vowel (V~.V): the syltraj walk drops "
+    "this sequence — replace the dot with a short pause (space), or make "
+    "the second vowel oral")
+
+
+def nasal_link_warning(sampa: str) -> List[str]:
+    """Warn about nasal-vowel + linked-vowel sequences (V~.V / V~V).
+
+    All symbols are valid so the guard cannot flag them, but the syltraj
+    walk silently reduces the sequence to a background block (both vowels
+    are lost from the plan and the audio). Kept on record in the engine
+    CHANGELOG; the FR G2P avoids it since the nasal-boundary fix.
+    """
+    if _NASAL_LINK_RE.search(sampa or ""):
+        return [_NASAL_LINK_WARNING]
+    return []
+
+
 def inventory_digest() -> Dict[str, Any]:
     return {
         "vowels": " ".join(VOWELS) + " (+ nasalized V~)",
@@ -813,7 +833,7 @@ def preview(req: PreviewRequest) -> Dict[str, Any]:
         "final_sampa": final,
         "words": words,
         "groups": groups,
-        "warnings": warnings,
+        "warnings": warnings + nasal_link_warning(final),
         "tokens": tokens,
         "rejected_symbols": rejected,
         "language": req.lang,
@@ -938,6 +958,7 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
 
     warnings: List[str] = []
     breath_ms: Optional[float] = BREATH_MS if "%" in src else None
+    warnings.extend(nasal_link_warning(src))
     try:
         st = structure_compile(src, req.lang, req.timings, breath_ms)
     except RuntimeError as exc:

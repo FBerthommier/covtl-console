@@ -271,6 +271,9 @@ export class SyllableCompiler {
         el('span', { text: `${m.anchors} anchors · ${m.blocks} blocks · ${m.duration_s.toFixed(2)} s of planned gestures. ` }),
         el('span', { class: 'dim', text: 'Inspection only — nothing was synthesized. ' }),
         el('span', { text: 'Click a card below to inspect a segment, or press Synthesize to hear this string.' }));
+      for (const w of r.warnings || []) {
+        note.append(el('br'), el('span', { class: 'warn-line', text: `⚠ ${w}` }));
+      }
       this.opts.onLog?.(`compiled ${m.syllables} syllable(s) · ${m.blocks} blocks · ${m.anchors} anchors · ${m.duration_s.toFixed(2)} s${r.cached ? ' (cache hit)' : ''}`);
     } catch (err) {
       this.result = null;

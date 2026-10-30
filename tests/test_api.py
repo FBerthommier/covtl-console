@@ -149,6 +149,28 @@ def test_compile_guard_error_422(client):
 
 
 @requires_engine
+def test_compile_warns_on_nasal_link(client):
+    """Hand-written V~.V is dropped by the syltraj walk (engine limitation,
+    kept on record): /api/compile must warn about it."""
+    r = client.post("/api/compile", json={
+        "text": "kOma~.a.le.vu", "lang": "fr"})
+    assert r.status_code == 200
+    warnings = r.json()["warnings"]
+    assert any("V~.V" in w for w in warnings), warnings
+    # and the plan indeed lacks the nasal vowel (background block instead)
+    vowels = [b["vowel_key"] for b in r.json()["blocks"] if b["kind"] == "plateau"]
+    assert "a~" not in vowels
+
+
+@requires_engine
+def test_preview_warns_on_nasal_link(client):
+    r = client.post("/api/preview", json={
+        "text": "kOma~.a.le.vu", "mode": "phonetic", "lang": "fr"})
+    assert r.status_code == 200
+    assert any("V~.V" in w for w in r.json()["warnings"])
+
+
+@requires_engine
 def test_error_envelope_shape(client):
     r = client.post("/api/compile", json={
         "text": "cleanpan", "lang": "en", "guard_policy": "error"})
