@@ -76,6 +76,11 @@ must read **live**.
       watermark of past journeys; switching journeys is a clean switch
       at the anchor boundary; reduced vowels (@, 6) show as hollow
       rings; phonetic labels cover the current journey only.
+- [ ] **Origin/target anchors colored**: the current journey's origin is
+      a red dot and its target a green ring, both drawn above the white
+      head (on a stationary hold they stack: green ring around the red
+      dot); the blue excursion always reads from the red dot to the
+      green ring. No amber ``next anchor'' ring remains.
 - [ ] `[` / `]` step anchors exactly (head lands on the anchor tick, not
       between); the scrub bar's ticks ARE the anchors.
 - [ ] `L` loops the current block; speeds 0–3 (0.25×/0.5×/1×/2×) apply to
