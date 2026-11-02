@@ -33,11 +33,12 @@ must read **live**.
 - [ ] Guard error → switch policy to `warn`: the same input relabels from
       blocking error to inline red-reject warning; suggestions offered
       (`c` → `k, s`); strip action removes the red symbols.
-- [ ] **Nasal-link warning**: compiling a hand-written `V~.V` string
-      (e.g. `kOma~.a.le.vu`) shows the plan PLUS a `⚠ nasal vowel
-      followed by a linked vowel` line in the compiler note, and the
-      dropped vowels appear as a `-` background stretch — the string must
-      be rephrased with a short pause (space).
+- [ ] **Nasal hiatus (V~.V) labeled**: compiling a hand-written `V~.V`
+      string (e.g. `kOma~.a.le.vu`) shows the hiatus as a background
+      stretch LABELED with its nasal notation (`a~.a`) — the engine
+      realizes it as a diphthong background arc with a nasalized
+      transition (V1V2 nasal_preproc), so the audio carries both vowels
+      even though the stretch is a background block.
 - [ ] **Input reset (`R` / Reset input button)**: with an ortho draft, a
       phonetic draft AND an edited final SAMPA active, one reset clears
       both panes, drops the edited badge, hides the editor, empties the

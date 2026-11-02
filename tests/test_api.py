@@ -149,25 +149,20 @@ def test_compile_guard_error_422(client):
 
 
 @requires_engine
-def test_compile_warns_on_nasal_link(client):
-    """Hand-written V~.V is dropped by the syltraj walk (engine limitation,
-    kept on record): /api/compile must warn about it."""
+def test_compile_labels_nasal_hiatus(client):
+    """V~.V hiatus: handled engine-side since the V1V2 fix (nasal_preproc);
+    the plan keeps the hiatus as a background stretch LABELED with its
+    vowels instead of a bare '-'."""
     r = client.post("/api/compile", json={
         "text": "kOma~.a.le.vu", "lang": "fr"})
     assert r.status_code == 200
-    warnings = r.json()["warnings"]
-    assert any("V~.V" in w for w in warnings), warnings
-    # and the plan indeed lacks the nasal vowel (background block instead)
-    vowels = [b["vowel_key"] for b in r.json()["blocks"] if b["kind"] == "plateau"]
-    assert "a~" not in vowels
-
-
-@requires_engine
-def test_preview_warns_on_nasal_link(client):
-    r = client.post("/api/preview", json={
-        "text": "kOma~.a.le.vu", "mode": "phonetic", "lang": "fr"})
-    assert r.status_code == 200
-    assert any("V~.V" in w for w in r.json()["warnings"])
+    blocks = r.json()["blocks"]
+    backgrounds = [b for b in blocks if b["kind"] == "background"]
+    assert backgrounds, "the hiatus background arc is expected in the plan"
+    hiatus = [b.get("hiatus") for b in backgrounds if b.get("hiatus")]
+    assert hiatus and any("a~" in h for h in hiatus), blocks
+    stretches = [s["stretch"] for s in r.json()["segments_preview"]]
+    assert any("a~" in s for s in stretches), stretches
 
 
 @requires_engine

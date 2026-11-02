@@ -86,10 +86,13 @@ def _verify_anchor_timing(S, job):
         "anchors must land on 100 Hz grid steps"
 
     # 2 — every anchor time IS an engine block boundary (independent
-    # re-walk of the engine; subset invariant, see module docstring)
+    # re-walk of the engine; subset invariant, see module docstring).
+    # Mirrors the engine's build_phrase_tract: normalize, then oralize the
+    # nasal members of linked hiatuses (V1V2 nasal_preproc) before the walk.
     from vtl_synth.core import syltraj
     from vtl_synth.core.continuous import _normalize_ipa
     from vtl_synth.core.syltraj import _normalize_word
+    from vtl_synth.core.nasal_preproc import split_nasal_hiatus
 
     phrases = S._phrases_of(job["sampa"])
     step = 0
@@ -97,8 +100,9 @@ def _verify_anchor_timing(S, job):
     n_iter_total = 0
     for phrase in phrases:
         ipa = _normalize_ipa(_normalize_word(phrase))
+        motor, _plan = split_nasal_hiatus(ipa)
         _pv, blocks, _nodes, anch = syltraj.build_phrase_pval(
-            ipa, t_cons=T_CONS, t_voy=T_VOY,
+            motor, t_cons=T_CONS, t_voy=T_VOY,
             pause_short_ms=PAUSE_SHORT_MS, pause_long_ms=PAUSE_LONG_MS,
             sampa_guard="off")
         b = 0

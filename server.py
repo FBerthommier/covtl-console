@@ -188,24 +188,10 @@ def local_rejected(sampa: str) -> List[Dict[str, Any]]:
                             for t in tokenize(sampa) if t["kind"] == "rejected"])
 
 
-_NASAL_LINK_RE = re.compile(r"[aeiouyEO@269]~[.\-]?[aeiouyEO@269]")
-_NASAL_LINK_WARNING = (
-    "nasal vowel followed by a linked vowel (V~.V): the syltraj walk drops "
-    "this sequence — replace the dot with a short pause (space), or make "
-    "the second vowel oral")
-
-
-def nasal_link_warning(sampa: str) -> List[str]:
-    """Warn about nasal-vowel + linked-vowel sequences (V~.V / V~V).
-
-    All symbols are valid so the guard cannot flag them, but the syltraj
-    walk silently reduces the sequence to a background block (both vowels
-    are lost from the plan and the audio). Kept on record in the engine
-    CHANGELOG; the FR G2P avoids it since the nasal-boundary fix.
-    """
-    if _NASAL_LINK_RE.search(sampa or ""):
-        return [_NASAL_LINK_WARNING]
-    return []
+# NOTE: nasal-vowel + linked-vowel sequences (V~.V) are handled by the
+# engine since the V1V2 fix (nasal_preproc + VO gate over the hiatus
+# background arc) — no warning needed; the compiler labels the hiatus
+# stretch with its vowels instead.
 
 
 def inventory_digest() -> Dict[str, Any]:
@@ -308,8 +294,21 @@ async def no_cache_assets(request: Request, call_next):  # noqa: ANN001
 def _instrumented_phrase_build(phrase: str, t_cons: int, t_voy: int,
                                pause_short_ms: float, pause_long_ms: float,
                                pause_breath_ms: Optional[float] = None) -> Dict[str, Any]:
-    """One phrase → dict(anchors, blocks, nodes, n_steps) with anchor times."""
+    """One phrase → dict(anchors, blocks, nodes, n_steps) with anchor times.
+
+    Mirrors the engine's build_phrase_tract: normalize, then oralize the
+    nasal members of linked hiatuses (V~.V, nasal_preproc V1V2) before the
+    walk — nasality is re-injected in the audio layer (VO gate); the plan
+    keeps the hiatus as a background diphthong arc, labeled with its
+    vowels below."""
     import vtl_synth.core.syltraj as syl
+    from vtl_synth.core.continuous import _normalize_ipa
+    from vtl_synth.core.syltraj import _normalize_word as _syl_norm
+    from vtl_synth.core.nasal_preproc import split_nasal_hiatus, \
+        nasal_hiatus_intervals
+
+    ipa = _normalize_ipa(_syl_norm(phrase))
+    motor, nasal_plan = split_nasal_hiatus(ipa)
 
     ledger: List[Any] = []          # SylBlock instances, in construction order
     iter_marks: List[int] = []      # len(ledger) at each anchor-pair iteration
@@ -330,12 +329,18 @@ def _instrumented_phrase_build(phrase: str, t_cons: int, t_voy: int,
     syl._collect_consonants = cc_hooked
     try:
         _pval, blocks, nodes, anchors = syl.build_phrase_pval(
-            phrase, t_cons=t_cons, t_voy=t_voy,
+            motor, t_cons=t_cons, t_voy=t_voy,
             pause_short_ms=pause_short_ms, pause_long_ms=pause_long_ms,
             pause_breath_ms=pause_breath_ms, sampa_guard="off")
     finally:
         syl.SylBlock = orig_block
         syl._collect_consonants = orig_cc
+
+    try:
+        hiatus_intervals = nasal_hiatus_intervals(
+            ledger, nasal_plan, t_voy=int(round(t_voy)))
+    except Exception:
+        hiatus_intervals = []
 
     if len(ledger) != len(blocks):
         raise RuntimeError(
@@ -381,13 +386,26 @@ def _instrumented_phrase_build(phrase: str, t_cons: int, t_voy: int,
     step = 0
     out_blocks = []
     for b in ledger:
-        out_blocks.append({
+        rec = {
             "kind": b.kind, "n_steps": int(b.n_steps),
             "t0": step / 100.0, "t1": (step + b.n_steps) / 100.0,
             "n_cons": int(b.n_cons), "cons_keys": list(b.cons_keys),
             "vowel_key": b.vowel_key, "pre": b.pre_token, "post": b.post_token,
             "long": bool(b.long), "breath": bool(b.breath),
-        })
+        }
+        if b.kind == "background" and hiatus_intervals:
+            # hiatus members realized as this background arc (nasal_preproc);
+            # label with the ORIGINAL nasal notation from the plan runs
+            # (node keys are oral bases — nasality is a flag there)
+            keys = [k for (t0, t1, k) in hiatus_intervals
+                    if t0 < step + b.n_steps and t1 > step]
+            if keys:
+                labels = [".".join(m["key"] + ("~" if m.get("nasal") else "")
+                                   for m in run)
+                          for run in (nasal_plan.get("runs") or [])
+                          if any(m["key"] in keys for m in run)]
+                rec["hiatus"] = " + ".join(labels) or "+".join(dict.fromkeys(keys))
+        out_blocks.append(rec)
         step += b.n_steps
 
     return {"anchors": out_anchors, "blocks": out_blocks,
@@ -833,7 +851,7 @@ def preview(req: PreviewRequest) -> Dict[str, Any]:
         "final_sampa": final,
         "words": words,
         "groups": groups,
-        "warnings": warnings + nasal_link_warning(final),
+        "warnings": warnings,
         "tokens": tokens,
         "rejected_symbols": rejected,
         "language": req.lang,
@@ -958,7 +976,6 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
 
     warnings: List[str] = []
     breath_ms: Optional[float] = BREATH_MS if "%" in src else None
-    warnings.extend(nasal_link_warning(src))
     try:
         st = structure_compile(src, req.lang, req.timings, breath_ms)
     except RuntimeError as exc:
@@ -989,7 +1006,9 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
         span = [b for b in st["blocks"] if b["t0"] < a1["t"] - 1e-9 and b["t1"] > a0["t"] + 1e-9]
         cons = [c for b in span for c in b["cons_keys"]]
         vowel = next((b["vowel_key"] for b in span if b["kind"] == "plateau"), "")
-        label = ("".join(cons) + (vowel or "")) or a0["label"] or a1["label"] or "-"
+        hiatus = next((b["hiatus"] for b in span if b.get("hiatus")), "")
+        label = ("".join(cons) + (vowel or "")) or hiatus or a0["label"] \
+            or a1["label"] or "-"
         # chronological stretch string: engine order, '‿' marks consonants
         # following a vowel inside the same stretch (coda fused with the
         # next onset — coarticulation, not a syllable boundary)
@@ -1001,6 +1020,8 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
                 saw_vowel = True
             elif b["kind"] == "cluster" and b["cons_keys"]:
                 out_s += ("‿" if saw_vowel else "") + "".join(b["cons_keys"])
+            elif b["kind"] == "background":
+                out_s += b.get("hiatus") or "-"
             elif b["breath"]:
                 out_s += "%"
             elif b["kind"] == "pause":
