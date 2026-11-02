@@ -300,15 +300,25 @@ def _instrumented_phrase_build(phrase: str, t_cons: int, t_voy: int,
     nasal members of linked hiatuses (V~.V, nasal_preproc V1V2) before the
     walk — nasality is re-injected in the audio layer (VO gate); the plan
     keeps the hiatus as a background diphthong arc, labeled with its
-    vowels below."""
+    vowels below. Requires an engine carrying the V1V2 fix: with an older
+    engine the import fails and the walk falls back to the raw normalized
+    phrase (conservative, pre-V1V2 behavior)."""
     import vtl_synth.core.syltraj as syl
     from vtl_synth.core.continuous import _normalize_ipa
     from vtl_synth.core.syltraj import _normalize_word as _syl_norm
-    from vtl_synth.core.nasal_preproc import split_nasal_hiatus, \
-        nasal_hiatus_intervals
 
     ipa = _normalize_ipa(_syl_norm(phrase))
-    motor, nasal_plan = split_nasal_hiatus(ipa)
+    try:
+        from vtl_synth.core.nasal_preproc import split_nasal_hiatus, \
+            nasal_hiatus_intervals
+        motor, nasal_plan = split_nasal_hiatus(ipa)
+        nasal_plan["intervals"] = None
+    except ImportError:
+        # engine without the V1V2 fix: conservative fallback
+        motor, nasal_plan = ipa, {"runs": [], "events": []}
+
+        def nasal_hiatus_intervals(block_info, plan, t_voy=None):
+            return []
 
     ledger: List[Any] = []          # SylBlock instances, in construction order
     iter_marks: List[int] = []      # len(ledger) at each anchor-pair iteration
