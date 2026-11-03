@@ -165,3 +165,36 @@ labeled "demo arithmetic — approximate" everywhere.
 - Known acceptable behaviors: hidden tabs throttle rAF (watchdog covers
   the clock; rendering resumes on focus); demo compiler is arithmetic
   (labeled), the real walk needs the bridge.
+
+---
+
+## I. Addendum (2026-11-03) — V1V2 hiatus labeling completed + covtl-sandhi integration
+
+Engine side: `304f04c` (nasal_preproc V1V2 layer) + the covtl-sandhi
+Branch-A hook (`82694bc`, default off) landed in covtl-pipeline; the
+console tracks both.
+
+- **Hiatus labeling completed.** `nasal_hiatus_intervals` MERGES adjacent
+  nasal slots into one velar-open interval keyed on the oral bases —
+  the merged `V~.V~` case (`ta~.a~ta`) labeled the background arc with
+  the raw merged key (`a+a`) instead of the run's nasal notation. The
+  label is now re-derived from the plan runs: `a~.a`, `a.a~`,
+  `a~.a~`. The segment payload carries the per-block `hiatus` label,
+  and a pure background journey (no plateau, no cluster) figures the
+  arrival vowel above the green target anchor on the polar disc —
+  such journeys drew no phonetic label at all before.
+- **Compile plan == synth plan** re-verified empirically on the four
+  V1V2 phrases (`kOma~.a.le.vu`, `ta~.ata`, `ta.a~ta`, `ta~.a~ta`):
+  the console's instrumented mirror walk matches the engine's real
+  synthesis block ledger 1:1 (kinds, steps, vowel keys, flags).
+- **covtl-sandhi end-to-end.** Capability probe (None until Branch B is
+  present — never a crash), exposed on `/api/status` + `/api/health`;
+  `/api/preview` and the early polar stage (`_resolve_sampa`) apply the
+  exact `Pipeline.run` gateways (g2p oracle / post / pre, expressive
+  path included); `/api/synthesize` passes the level signature-guarded
+  and echoes it with a degradation note; all cache keys include the
+  level; `/api/compile` documents the no-op (SAMPA has no orthography).
+  UI: Prosody level/mode selects + live capability hint. There is NO
+  per-stretch `link_level` in the engine plan — an inserted liaison
+  consonant shows up like any onset cluster (single source of truth,
+  no UI reinterpretation).

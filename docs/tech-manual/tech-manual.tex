@@ -101,7 +101,8 @@ All bodies are JSON. Errors use one structured envelope everywhere
 \textbf{GET /api/health} & \texttt{status} in
 \texttt{ok|degraded|offline}, \texttt{engine\_version},
 \texttt{active\_speaker}, \texttt{active\_lang},
-\texttt{registry\_warnings} (speaker probe failures, absent lexicons). \\
+\texttt{registry\_warnings} (speaker probe failures, absent lexicons),
+\texttt{sandhi} capability block (below). \\
 \textbf{GET /api/languages} & Six entries
 \texttt{\{id, name, prosody\_profile, lexicon\_present\}} + the active
 language. \\
@@ -112,32 +113,47 @@ language. \\
 is \texttt{jd3}. \\
 \textbf{POST /api/preview} & Request
 \texttt{\{text?, sampa?, mode: ortho|phonetic, lang, expressive,
-policy?\}}. One round trip for the whole preview stack: response
+policy?, sandhi: off|minimal|standard|careful, sandhi\_mode:
+g2p|post|pre\}}. One round trip for the whole preview stack: response
 \texttt{\{g2p\_string, enriched\_string, final\_sampa, words[], groups[],
 warnings[], tokens[], rejected\_symbols[], language, lexicon,
 inventory\_digest, cache\}}. Passing \texttt{sampa} re-enriches an edited
-G2P string; phonetic mode runs the guard only. LRU(128); repeats answer
-\texttt{cache:true}. \\
+G2P string; phonetic mode runs the guard only. A non-\texttt{off}
+\texttt{sandhi} level is applied through the \emph{same gateways} as
+\texttt{Pipeline.run} (below) and degrades to \texttt{off} with a
+warning when Branch B is missing, the language has no rule module, or
+the input is a phonetic string; a bad level/mode is a 422. LRU(128);
+repeats answer \texttt{cache:true}. \\
 \textbf{POST /api/preview/sampa} & Guard-only tokenization:
 \texttt{\{tokens, rejected\}}. (Deprecated v1 \texttt{/api/preview/g2p}
 still works, forwarding to the unified preview.) \\
 \textbf{POST /api/compile} & Request
-\texttt{\{text, lang, timings, guard\_policy, expressive\}}. Runs the
+\texttt{\{text, lang, timings, guard\_policy, expressive, sandhi,
+sandhi\_mode\}}. Runs the
 engine's anchor walk with \emph{no synthesis}: response carries
 \texttt{anchors[], blocks[], nodes[], metrics\{anchors, segments, blocks,
 syllables, clusters, consonants, vowels, steps, duration\_s\}},
 \texttt{segments\_preview[]} (per anchor pair: label, chronological
 \texttt{stretch} with the \utie{} coda marker, cons/vowel, kinds, n\_steps),
 per-phoneme \texttt{targets\{rho, theta, category\}}, rejected symbols,
-warnings. Guard \texttt{error} + rejected $\Rightarrow$ 422
+warnings, the \texttt{sandhi} capability block. A requested sandhi level
+is a documented no-op here (SAMPA blocks carry no orthography — the
+level acts at the text$\rightarrow$SAMPA stage) and yields a warning.
+Guard \texttt{error} + rejected $\Rightarrow$ 422
 \texttt{SampaGuardError}. LRU(64). \\
 \textbf{POST /api/synthesize} & Request (superset):
 \texttt{\{text, mode, lang, speaker, expressive, f0, timings, engine,
 ortho, outputMode: audio|sagittal|polar, guardPolicy, outputDir, label,
-exports\}}. Guard \texttt{error} is validated \emph{before} any job
-starts ($\Rightarrow$ 422). Response \texttt{\{job\_id, cached, echo\}};
-\texttt{echo} repeats the full resolved parameter set (the log line).
-Cache hit requires state \texttt{done} + all artifacts on disk. \\
+exports, sandhi, sandhi\_mode\}}. Guard \texttt{error} is validated
+\emph{before} any job starts ($\Rightarrow$ 422). Response
+\texttt{\{job\_id, cached, echo\}};
+\texttt{echo} repeats the full resolved parameter set (the log line),
+including \texttt{sandhi}/\texttt{sandhi\_mode} and a
+\texttt{sandhi\_note} degradation notice when Branch B is missing. The
+level is passed to the \texttt{Pipeline} when its signature carries it
+(signature-guarded like every engine option); the synth cache key
+includes it. Cache hit requires state \texttt{done} + all artifacts on
+disk. \\
 \textbf{GET /api/job/\{id\}} & Job payload: \texttt{state}
 (\texttt{queued|running|cancelling|done|error|cancelled}), \texttt{stage}
 (\texttt{g2p|trajectory|vtl|wav|video}), \texttt{progress},
@@ -152,6 +168,55 @@ wav\_url\}}, error fields. \\
 \textbf{GET /api/job/\{id\}/files/\{name\}} & \texttt{FileResponse} for
 any artifact registered on the job. \\
 \end{longtable}
+
+\subsection{Cross-word sandhi (covtl-sandhi)}
+
+The bridge integrates the engine's \emph{Branch-A hook}
+(\texttt{vtl\_synth.utils.sandhi}, default \texttt{off}) without ever
+re-interpreting it. Architecture and rules live in the companion
+\texttt{covtl-sandhi} package (\emph{Branch B}, six languages: fr
+liaison, en a$\rightarrow$an + onset linking, it raddoppiamento + euphonic
+d, es enlace + y$\rightarrow$e/o$\rightarrow$u, pt encadeamento + EP
+voicing, de Glottalversatz), installed on the engine either by copying
+its \texttt{sandhi/} folder over the engine's stub or by pip.
+
+\begin{itemize}
+\item \textbf{Capability probe.} At import the bridge resolves the rule
+  package exactly as \texttt{Pipeline} does (stub, then top-level
+  \texttt{import sandhi}); until \texttt{SANDHI\_FULL} is true the
+  capability stays \emph{unavailable} and \texttt{sandhi\_capability()}
+  reports \texttt{\{available: false, reason: ...\}}. No consumer can
+  crash the bridge on a missing package: the preview degrades with a
+  warning, the job echo carries a \texttt{sandhi\_note}.
+\item \textbf{Levels} \texttt{off|minimal|standard|careful} --- a
+  monotone coverage filter over each language's rule set (minimal
+  $\subseteq$ standard $\subseteq$ careful; it decides which word-pair
+  classes may fire, never the phonology of a firing rule). \textbf{Modes}
+  \texttt{g2p} (liaison-aware per-word gateway + pair merge,
+  recommended), \texttt{post} (SAMPA post-processor), \texttt{pre}
+  (orthographic rewrite before the g2p).
+\item \textbf{Preview path.} \texttt{/api/preview} mirrors
+  \texttt{Pipeline.run}'s degradation order (off for phonetic input, off
+  without Branch B, off without a rule module for the language --- each
+  with a printed warning) and then applies the same three gateways; the
+  expressive path wraps the per-word g2p in \texttt{sandhi\_oracle} and
+  closes with \texttt{apply\_sandhi\_sampa} (never across a
+  \texttt{\%} breath pause). The word chips use the same per-word
+  oracle.
+\item \textbf{Synthesis path.} \texttt{/api/synthesize} passes
+  \texttt{sandhi}/\texttt{sandhi\_mode} to the \texttt{Pipeline} when
+  its signature carries them; \texttt{\_resolve\_sampa} applies the same
+  gateways so the early polar stage compiles the SAMPA the engine will
+  actually speak (compile plan == synth plan). The cache keys
+  (preview, compile, synth) all include the level.
+\item \textbf{No per-stretch link level.} The engine's articulation plan
+  has no \texttt{link\_level} attribute: a liaison consonant inserted at
+  the text$\rightarrow$SAMPA gateway appears in the compiled plan like
+  any onset cluster, and the polar display follows the engine geometry
+  unchanged (WYSIWYG contract). The nasal hiatus labels
+  (\texttt{a~.a}, \texttt{a.a~}, merged \texttt{V\~{}.V\~{}} $\rightarrow$
+  \texttt{a~.a~}) are the separate V1V2 feature of the plan itself.
+\end{itemize}
 
 \subsection{The segment payload}
 

@@ -57,6 +57,18 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
   labeled chips, and clickable block cards exposing onset clusters with
   their (ρ, θ) targets and vowel plateaus. After synthesis, clicking a card
   seeks the polar display to exactly that segment.
+- **Cross-word sandhi (liaison)** — the Prosody group exposes the engine's
+  covtl-sandhi level (`off · minimal · standard · careful`) and gateway
+  mode (`g2p · post · pre`): fr liaison (`faut il → fo.til`), en
+  `a apple → @.na.p@l`, it raddoppiamento, es enlace, pt encadeamento,
+  de Glottalversatz. Needs the companion
+  [covtl-sandhi](https://github.com/FBerthommier/covtl-sandhi) rule package
+  on the engine; without it the level degrades to `off` with an explicit
+  warning (bit-identical output). The bridge publishes its capability on
+  `/api/status` and `/api/health`, and the UI reflects it live. Nasal
+  hiatuses (`V~.V`) are a separate engine feature (V1V2): they compile to
+  a diphthong background arc labeled with the run's nasal notation
+  (`a~.a`, `a.a~`, merged `V~.V~` → `a~.a~`).
 - **Red-reject SAMPA guard** — symbols outside the engine inventory are
   highlighted in red with suggestions (`c` → `k, s`, IPA `ʃ` → `S`, …);
   policies `warn` / `error` / `off`, one-click strip action.

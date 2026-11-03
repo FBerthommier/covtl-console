@@ -360,6 +360,26 @@ so it composes with any speaker. The \emph{Base f0} field (60--350\,Hz,
 clamped) is pre-filled from the speaker registry; \emph{reset to speaker}
 restores it.
 
+The same group exposes \textbf{cross-word sandhi} (\emph{liaison}) ---
+\texttt{--sandhi off|minimal|standard|careful} and
+\texttt{--sandhi-mode g2p|post|pre}. Levels are a monotone coverage
+filter over each language's rule set (they decide which word-pair
+classes may fire, never the phonology of a firing rule):
+\emph{minimal} keeps the categorical, exceptionless rules;
+\emph{standard} (recommended) adds the productive ones --- French
+liaison (\texttt{faut il} $\rightarrow$ \texttt{fo.til}), English
+\texttt{a apple} $\rightarrow$ \texttt{@.na.p@l}, Italian
+raddoppiamento, Spanish enlace, Portuguese encadeamento, German
+Glottalversatz; \emph{careful} is the hyperarticulate register (French
+\emph{style soutenu}, German boundaries before function words). The
+level acts at the \emph{text}→SAMPA stage: changing it re-previews, and
+the compiled plan shows an inserted liaison consonant like any onset
+cluster. The rules live in the companion \texttt{covtl-sandhi} package
+on the engine side; when it is absent the chosen level degrades to
+\texttt{off} with an explicit warning (bit-identical output), and the
+hint under the selects shows which rule modules the bridge actually
+has.
+
 \section{Audio, spectrogram, downloads and exports}
 \label{sec:audio}
 
@@ -430,8 +450,18 @@ the next vowel & A hand-written nasal vowel followed by a linked vowel
 (\texttt{V\~{}.V}, e.g. \texttt{kOma~.a.le.vu}) is realized by the
 engine as a \emph{background diphthong arc with a nasalized transition}
 (V1V2 correction): the plan shows the hiatus as a background stretch
-labeled with its nasal notation (\texttt{a~.a}) and the audio carries
-both vowels. The compiler labels the stretch so nothing is silent. \\
+labeled with its nasal notation (\texttt{a~.a}; both members nasal,
+\texttt{V\~{}.V\~{}} $\rightarrow$ \texttt{a~.a~}) and the audio carries
+both vowels. The polar display figures the arrival vowel above the green
+target anchor on such journeys. \\
+The sandhi (liaison) level does nothing, and the preview warns about
+``covtl-sandhi'' & The rule package is not installed on the engine: the
+chosen level degrades to \texttt{off} (bit-identical output). Install
+\texttt{covtl-sandhi} on the engine side (copy its \texttt{sandhi/}
+folder over the engine's stub or \texttt{pip install covtl-sandhi});
+the hint under the Prosody selects lists the rule modules actually
+available. On a phonetic (SAMPA) input the level is also ignored ---
+it applies to the text$\rightarrow$SAMPA stage. \\
 Polar display freezes in a background tab & Expected: browsers throttle
 background tabs; the clock catches up (watchdog), rendering resumes on
 focus. \\

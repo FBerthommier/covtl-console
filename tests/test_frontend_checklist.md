@@ -38,7 +38,22 @@ must read **live**.
       stretch LABELED with its nasal notation (`a~.a`) — the engine
       realizes it as a diphthong background arc with a nasalized
       transition (V1V2 nasal_preproc), so the audio carries both vowels
-      even though the stretch is a background block.
+      even though the stretch is a background block. Both members nasal
+      (`ta~.a~ta`) read `a~.a~` (the merged velar-open interval, never
+      the raw `a+a` key), and `ta.a~ta` reads `a.a~`.
+- [ ] **Hiatus journey labeled on the polar disc**: on a pure background
+      journey (no plateau, no cluster — the hiatus diphthong arc) the
+      arrival vowel is figured above the green target anchor, so the
+      arc is never unlabeled.
+- [ ] **Cross-word sandhi (liaison) controls**: the Prosody group has
+      the level (`off/minimal/standard/careful`) and mode
+      (`g2p/post/pre`) selects with a hint; the hint lists the rule
+      modules the bridge actually has (or shows the missing-package
+      reason in amber); changing the level re-previews; the level
+      survives a reload (persisted settings). Without the covtl-sandhi
+      rule package on the engine, a chosen level degrades to `off` with
+      an explicit warning in the preview stack and the job log —
+      bit-identical output, never a crash.
 - [ ] **Input reset (`R` / Reset input button)**: with an ortho draft, a
       phonetic draft AND an edited final SAMPA active, one reset clears
       both panes, drops the edited badge, hides the editor, empties the
