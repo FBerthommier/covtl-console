@@ -11,6 +11,10 @@ per-system matrix live in the [README](README.md#installation--every-system).
 git clone https://github.com/FBerthommier/covtl-pipeline.git
 cd covtl-pipeline && pip install . && cd ..
 
+# 1b) the cross-word sandhi rules (liaison) — recommended: the UI
+#     preselects the 'standard' level
+pip install git+https://github.com/FBerthommier/covtl-sandhi.git
+
 # 2) the console
 git clone https://github.com/FBerthommier/covtl-console.git
 cd covtl-console && pip install fastapi uvicorn
@@ -22,7 +26,10 @@ python server.py
 Open <http://127.0.0.1:8421> in Chrome, Edge or Firefox. The header's
 backend chip must read **live** — if it reads *demo*, the engine was not
 importable in this interpreter and the console is simulating (see README
-§Installation for venv and per-system notes).
+§Installation for venv and per-system notes). The hint under the Prosody
+sandhi selects lists the rule languages the bridge actually has; if it
+shows the *not installed* reason instead, step 1b was skipped and the
+sandhi level degrades to `off` with a warning.
 
 **No Python at all?** Double-click `covtl-console-standalone.html` — the
 console runs in clearly-labeled demo mode, and automatically uses a live

@@ -187,8 +187,10 @@ def test_cancel_queued_job(client, S):
 def test_sandhi_echo_and_degradation_note(client, S):
     """The echo carries the requested sandhi level/mode; without the
     Branch B rule package a degradation note lands in the echo (the
-    Pipeline itself degrades to off, bit-identical output)."""
-    from vtl_synth.utils import sandhi as hook
+    Pipeline itself degrades to off, bit-identical output). The note's
+    presence follows the bridge's resolved capability (server.SANDHI),
+    not the stub's own flag — the pipeline resolves the pip-installed
+    package as a top-level 'sandhi' import."""
     kw = {"text": "ba da", "sandhi": "standard", "outputDir": _unique_dir(),
           "label": "sandhiecho"}
     out = _run(client, **kw)
@@ -196,8 +198,10 @@ def test_sandhi_echo_and_degradation_note(client, S):
     assert out["echo"]["sandhi_mode"] == "g2p"
     job = _wait_done(S, out["job_id"])
     assert job["state"] == "done", job.get("error")
-    if not getattr(hook, "SANDHI_FULL", False):
+    if S.SANDHI is None:
         assert "covtl-sandhi" in (out["echo"].get("sandhi_note") or "")
+    else:
+        assert out["echo"].get("sandhi_note") is None
 
 
 def test_sandhi_level_separates_synth_cache(client, S):

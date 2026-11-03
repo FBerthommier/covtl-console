@@ -198,3 +198,20 @@ console tracks both.
   per-stretch `link_level` in the engine plan — an inserted liaison
   consonant shows up like any onset cluster (single source of truth,
   no UI reinterpretation).
+
+---
+
+## J. Addendum (2026-11-03, later) — covtl-sandhi installed, `standard` default
+
+- **The rule package is now part of the recommended install.** The
+  console UI preselects the `standard` sandhi level on fresh profiles
+  (state default + `<option selected>`); the engine/API default stays
+  `off`. Installation docs (README per-system blocks, INSTALL.md,
+  user manual §Installing) gained the step
+  `pip install git+https://github.com/FBerthommier/covtl-sandhi.git`
+  (or `pip install covtl-sandhi`); the Prosody hint states the default
+  and the install command. With the package present, liaison really
+  fires: fr `faut il → fo.til`, `mon ami → mO~.na.mi`, `les amis →
+  le.za.mi`, and `comment allez-vous` → `kOma~.ta.le.vu` (the liaison
+  [t] carries the transition — the V~.V hiatus becomes a plain
+  cluster, which the compiled plan shows honestly).

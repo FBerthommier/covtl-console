@@ -34,7 +34,7 @@ const state = {
   timings: { ...LANGUAGES.en.timings },
   customTimings: false,
   expressive: false,
-  sandhi: 'off',              // cross-word sandhi level (covtl-sandhi)
+  sandhi: 'standard',         // cross-word sandhi level (covtl-sandhi rules)
   sandhiMode: 'g2p',
   engine: 'syl',
   ortho: true,

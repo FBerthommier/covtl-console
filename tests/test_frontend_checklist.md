@@ -47,12 +47,15 @@ must read **live**.
       arc is never unlabeled.
 - [ ] **Cross-word sandhi (liaison) controls**: the Prosody group has
       the level (`off/minimal/standard/careful`) and mode
-      (`g2p/post/pre`) selects with a hint; the hint lists the rule
-      modules the bridge actually has (or shows the missing-package
-      reason in amber); changing the level re-previews; the level
-      survives a reload (persisted settings). Without the covtl-sandhi
-      rule package on the engine, a chosen level degrades to `off` with
-      an explicit warning in the preview stack and the job log —
+      (`g2p/post/pre`) selects with a hint, **`standard` preselected on
+      a fresh profile**; the hint lists the rule languages the bridge
+      actually has (or shows the missing-package reason in amber);
+      changing the level re-previews; the level survives a reload
+      (persisted settings). With `covtl-sandhi` installed on the
+      engine, a fr preview of `faut il` produces `fo.til` and the
+      liaison consonant shows up in the compiled plan as an onset
+      cluster; without the package, the chosen level degrades to `off`
+      with an explicit warning in the preview stack and the job log —
       bit-identical output, never a crash.
 - [ ] **Input reset (`R` / Reset input button)**: with an ortho draft, a
       phonetic draft AND an edited final SAMPA active, one reset clears

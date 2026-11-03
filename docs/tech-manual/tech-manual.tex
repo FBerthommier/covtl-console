@@ -187,7 +187,10 @@ its \texttt{sandhi/} folder over the engine's stub or by pip.
   capability stays \emph{unavailable} and \texttt{sandhi\_capability()}
   reports \texttt{\{available: false, reason: ...\}}. No consumer can
   crash the bridge on a missing package: the preview degrades with a
-  warning, the job echo carries a \texttt{sandhi\_note}.
+  warning, the job echo carries a \texttt{sandhi\_note}. With the
+  package installed (\texttt{pip install covtl-sandhi}) the capability
+  turns \emph{available} at the next bridge start and lists the six
+  rule languages.
 \item \textbf{Levels} \texttt{off|minimal|standard|careful} --- a
   monotone coverage filter over each language's rule set (minimal
   $\subseteq$ standard $\subseteq$ careful; it decides which word-pair
@@ -195,6 +198,11 @@ its \texttt{sandhi/} folder over the engine's stub or by pip.
   \texttt{g2p} (liaison-aware per-word gateway + pair merge,
   recommended), \texttt{post} (SAMPA post-processor), \texttt{pre}
   (orthographic rewrite before the g2p).
+\item \textbf{Defaults.} The engine and every request model default to
+  \texttt{off} (the engine CLI default — API callers get the
+  bit-identical baseline); only the UI preselects \texttt{standard}
+  (state \texttt{sandboxhi}, persisted in settings, sent explicitly on
+  every preview/synthesis call).
 \item \textbf{Preview path.} \texttt{/api/preview} mirrors
   \texttt{Pipeline.run}'s degradation order (off for phonetic input, off
   without Branch B, off without a rule module for the language --- each

@@ -209,10 +209,14 @@ def test_sandhi_capability_in_status_and_health(client):
 
 
 @requires_engine
-def test_preview_sandhi_degrades_without_branch_b(client):
-    """A requested level without the rule package degrades to off with a
-    clear warning — the SAMPA stays the plain G2P output (never a silent
-    change, never a crash)."""
+def test_preview_sandhi_degrades_without_branch_b(client, monkeypatch):
+    """Without the rule package a requested level degrades to off with a
+    clear warning — the SAMPA stays the plain G2P output (never a
+    silent change, never a crash). The degradation state is forced
+    hermetically: this test holds whether or not covtl-sandhi is
+    installed on the host."""
+    import server
+    monkeypatch.setattr(server, "SANDHI", None)
     base = client.post("/api/preview", json={
         "text": "faut il", "mode": "ortho", "lang": "fr"}).json()
     r = client.post("/api/preview", json={
@@ -224,6 +228,23 @@ def test_preview_sandhi_degrades_without_branch_b(client):
         "without Branch B the level must be a no-op on the SAMPA"
     assert any("covtl-sandhi" in w for w in body["warnings"]), body["warnings"]
     assert not body["cache"] and base.get("cache") in (False, True)
+
+
+@requires_engine
+def test_preview_sandhi_fr_liaison_fires(client):
+    """With the covtl-sandhi rule package installed, the standard level
+    really applies French liaison through the preview's G2P gateway
+    (skipped on bridges without the package — CI installs the bare
+    engine)."""
+    import server
+    if server.SANDHI is None:
+        pytest.skip("covtl-sandhi rule package (Branch B) not installed")
+    r = client.post("/api/preview", json={
+        "text": "faut il", "mode": "ortho", "lang": "fr",
+        "sandhi": "standard", "sandhi_mode": "g2p"})
+    assert r.status_code == 200
+    assert r.json()["final_sampa"] == "fo.til", r.json()["final_sampa"]
+    assert not any("covtl-sandhi" in w for w in r.json()["warnings"])
 
 
 @requires_engine

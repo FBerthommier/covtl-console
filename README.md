@@ -58,17 +58,23 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
   their (ρ, θ) targets and vowel plateaus. After synthesis, clicking a card
   seeks the polar display to exactly that segment.
 - **Cross-word sandhi (liaison)** — the Prosody group exposes the engine's
-  covtl-sandhi level (`off · minimal · standard · careful`) and gateway
-  mode (`g2p · post · pre`): fr liaison (`faut il → fo.til`), en
-  `a apple → @.na.p@l`, it raddoppiamento, es enlace, pt encadeamento,
-  de Glottalversatz. Needs the companion
-  [covtl-sandhi](https://github.com/FBerthommier/covtl-sandhi) rule package
-  on the engine; without it the level degrades to `off` with an explicit
-  warning (bit-identical output). The bridge publishes its capability on
-  `/api/status` and `/api/health`, and the UI reflects it live. Nasal
-  hiatuses (`V~.V`) are a separate engine feature (V1V2): they compile to
-  a diphthong background arc labeled with the run's nasal notation
-  (`a~.a`, `a.a~`, merged `V~.V~` → `a~.a~`).
+  covtl-sandhi level and gateway mode (`g2p · post · pre`), with
+  **`standard` preselected by default** (fr liaison `faut il → fo.til`,
+  en `a apple → @.na.p@l`, it raddoppiamento, es enlace, pt encadeamento,
+  de Glottalversatz). The rules live in the companion
+  [covtl-sandhi](https://github.com/FBerthommier/covtl-sandhi) package on
+  the engine side — install it with the engine (`pip install covtl-sandhi`
+  or `pip install git+https://github.com/FBerthommier/covtl-sandhi.git`);
+  the bridge publishes whether it is present on `/api/status` and
+  `/api/health` and the UI hint reflects it live. Without it the level
+  degrades to `off` with an explicit warning (bit-identical output). The
+  engine/API default stays `off`; only the console UI preselects
+  `standard`. Nasal hiatuses (`V~.V`) are a separate engine feature
+  (V1V2): they compile to a diphthong background arc labeled with the
+  run's nasal notation (`a~.a`, `a.a~`, merged `V~.V~` → `a~.a~`) — under
+  a liaison level that fires, the inserted consonant carries the
+  transition and the hiatus becomes a plain cluster (e.g. `comment
+  allez-vous` → `kOma~.ta.le.vu`).
 - **Red-reject SAMPA guard** — symbols outside the engine inventory are
   highlighted in red with suggestions (`c` → `k, s`, IPA `ʃ` → `S`, …);
   policies `warn` / `error` / `off`, one-click strip action.
@@ -94,6 +100,11 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
 - The engine **covtl-pipeline** installed — `pip install .` from a clone of
   <https://github.com/FBerthommier/covtl-pipeline> (see its
   `INSTALLATION.md` for the VocalTractLab native binaries it manages)
+- The **covtl-sandhi** rule package (recommended — the cross-word sandhi
+  level is preselected to `standard` in the UI): `pip install covtl-sandhi`
+  or `pip install git+https://github.com/FBerthommier/covtl-sandhi.git`.
+  Without it every level degrades to `off` with a warning; with it the
+  bridge reports the six rule languages on `/api/health`.
 - Bridge dependencies: `fastapi` and `uvicorn`
 
 Without the engine the console still runs in **demo mode** (see below) —
@@ -114,6 +125,9 @@ git clone https://github.com/FBerthommier/covtl-pipeline.git
 cd covtl-pipeline
 py -3.12 -m pip install .
 # (VocalTractLab natives: follow INSTALLATION.md in the engine repo)
+
+# 1b) cross-word sandhi rules (liaison; recommended — UI default is standard)
+py -3.12 -m pip install git+https://github.com/FBerthommier/covtl-sandhi.git
 
 # 2) console
 cd ..
@@ -143,6 +157,7 @@ xcode-select --install
 
 git clone https://github.com/FBerthommier/covtl-pipeline.git
 cd covtl-pipeline && python3 -m pip install . && cd ..
+pip install git+https://github.com/FBerthommier/covtl-sandhi.git   # sandhi rules (liaison) — recommended
 
 git clone https://github.com/FBerthommier/covtl-console.git
 cd covtl-console
@@ -161,6 +176,7 @@ sudo apt install -y python3 python3-dev python3-venv python3-pip git
 
 git clone https://github.com/FBerthommier/covtl-pipeline.git
 cd covtl-pipeline && python3 -m pip install . && cd ..
+pip install git+https://github.com/FBerthommier/covtl-sandhi.git   # sandhi rules (liaison) — recommended
 
 git clone https://github.com/FBerthommier/covtl-console.git
 cd covtl-console
@@ -181,6 +197,7 @@ sudo dnf install -y python3 python3-devel git
 
 git clone https://github.com/FBerthommier/covtl-pipeline.git
 cd covtl-pipeline && python3 -m pip install . && cd ..
+pip install git+https://github.com/FBerthommier/covtl-sandhi.git   # sandhi rules (liaison) — recommended
 
 git clone https://github.com/FBerthommier/covtl-console.git
 cd covtl-console

@@ -38,3 +38,16 @@ def S():
     """The bridge module (jobs dict, models, helpers) for direct inspection."""
     import server as server_module
     return server_module
+
+
+@pytest.fixture(autouse=True)
+def _fresh_caches():
+    """Preview/compile responses are cached per server process; tests with
+    the same input keys (e.g. the sandhi degradation vs. liaison-fires
+    pair) must not read each other's cached entries."""
+    import server as S
+    S.PREVIEW_CACHE.clear()
+    S.COMPILE_CACHE.clear()
+    yield
+    S.PREVIEW_CACHE.clear()
+    S.COMPILE_CACHE.clear()

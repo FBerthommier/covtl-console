@@ -140,7 +140,7 @@
           <select id="sel-sandhi">
             <option value="off">off — no cross-word rules</option>
             <option value="minimal">minimal — categorical rules only</option>
-            <option value="standard">standard — recommended</option>
+            <option value="standard" selected>standard — recommended</option>
             <option value="careful">careful — hyperarticulate</option>
           </select></label>
         <label class="field"><span>Sandhi mode <kbd class="mini">--sandhi-mode</kbd></span>
@@ -156,7 +156,8 @@
           pitch accents) — touches only the glottis f0 column and pause durations.</p>
         <p class="hint" id="sandhi-note">Cross-word sandhi = liaison (fr <span class="mono">faut il → fo.til</span>,
           en <span class="mono">a apple → @.na.p@l</span>, it raddoppiamento, es enlace, pt encadeamento,
-          de Glottalversatz). Needs the <span class="mono">covtl-sandhi</span> rule package on the engine;
+          de Glottalversatz). Default <span class="mono">standard</span>. The rules live in the
+          <span class="mono">covtl-sandhi</span> package on the engine (<span class="mono">pip install covtl-sandhi</span>);
           without it the level degrades to <span class="mono">off</span> with a warning.</p>
       </section>
 

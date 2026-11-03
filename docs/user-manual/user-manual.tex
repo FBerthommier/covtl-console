@@ -63,6 +63,9 @@ mode) live in the repository's \texttt{README.md}; in short:
 \item Install the engine: clone
   \url{https://github.com/FBerthommier/covtl-pipeline} and run
   \texttt{pip install .} inside it (Python~3.9+, 3.12 recommended).
+\item Install the cross-word sandhi rules (recommended --- the UI
+  preselects the \emph{standard} liaison level):
+  \texttt{pip install covtl-sandhi}.
 \item In the console folder, run \texttt{pip install fastapi uvicorn}.
 \item Run \texttt{python server.py} and open \url{http://127.0.0.1:8421}
   in Chrome, Edge or Firefox.
@@ -362,11 +365,12 @@ restores it.
 
 The same group exposes \textbf{cross-word sandhi} (\emph{liaison}) ---
 \texttt{--sandhi off|minimal|standard|careful} and
-\texttt{--sandhi-mode g2p|post|pre}. Levels are a monotone coverage
+\texttt{--sandhi-mode g2p|post|pre}, with \textbf{standard preselected
+by default}. Levels are a monotone coverage
 filter over each language's rule set (they decide which word-pair
 classes may fire, never the phonology of a firing rule):
 \emph{minimal} keeps the categorical, exceptionless rules;
-\emph{standard} (recommended) adds the productive ones --- French
+\emph{standard} adds the productive ones --- French
 liaison (\texttt{faut il} $\rightarrow$ \texttt{fo.til}), English
 \texttt{a apple} $\rightarrow$ \texttt{@.na.p@l}, Italian
 raddoppiamento, Spanish enlace, Portuguese encadeamento, German
@@ -374,11 +378,13 @@ Glottalversatz; \emph{careful} is the hyperarticulate register (French
 \emph{style soutenu}, German boundaries before function words). The
 level acts at the \emph{text}→SAMPA stage: changing it re-previews, and
 the compiled plan shows an inserted liaison consonant like any onset
-cluster. The rules live in the companion \texttt{covtl-sandhi} package
-on the engine side; when it is absent the chosen level degrades to
-\texttt{off} with an explicit warning (bit-identical output), and the
-hint under the selects shows which rule modules the bridge actually
-has.
+cluster (e.g. \emph{comment allez-vous} becomes
+\texttt{kOma~.ta.le.vu} with the liaison [t]). The rules live in the
+companion \texttt{covtl-sandhi} package on the engine side ---
+\texttt{pip install covtl-sandhi} (see the installation section); the
+hint under the selects lists the rule modules the bridge actually has.
+When the package is absent the chosen level degrades to
+\texttt{off} with an explicit warning (bit-identical output).
 
 \section{Audio, spectrogram, downloads and exports}
 \label{sec:audio}
@@ -457,11 +463,12 @@ target anchor on such journeys. \\
 The sandhi (liaison) level does nothing, and the preview warns about
 ``covtl-sandhi'' & The rule package is not installed on the engine: the
 chosen level degrades to \texttt{off} (bit-identical output). Install
-\texttt{covtl-sandhi} on the engine side (copy its \texttt{sandhi/}
-folder over the engine's stub or \texttt{pip install covtl-sandhi});
-the hint under the Prosody selects lists the rule modules actually
-available. On a phonetic (SAMPA) input the level is also ignored ---
-it applies to the text$\rightarrow$SAMPA stage. \\
+\texttt{covtl-sandhi} on the engine side (\texttt{pip install
+covtl-sandhi} or copy its \texttt{sandhi/} folder over the engine's
+stub) and restart the bridge; the hint under the Prosody selects lists
+the rule modules actually available. On a phonetic (SAMPA) input the
+level is also ignored --- it applies to the text$\rightarrow$SAMPA
+stage. \\
 Polar display freezes in a background tab & Expected: browsers throttle
 background tabs; the clock catches up (watchdog), rendering resumes on
 focus. \\
