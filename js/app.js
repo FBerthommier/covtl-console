@@ -34,6 +34,8 @@ const state = {
   timings: { ...LANGUAGES.en.timings },
   customTimings: false,
   expressive: false,
+  sandhi: 'off',              // cross-word sandhi level (covtl-sandhi)
+  sandhiMode: 'g2p',
   engine: 'syl',
   ortho: true,
   guardPolicy: 'warn',        // brief §2.5 default
@@ -173,6 +175,7 @@ function saveSettings() {
     f0: state.f0Edited ? state.f0 : null,
     timings: state.customTimings ? state.timings : null,
     expressive: state.expressive, engine: state.engine, ortho: state.ortho,
+    sandhi: state.sandhi, sandhiMode: state.sandhiMode,
     guardPolicy: state.guardPolicy, outputMode: state.outputMode,
     displayPolar: state.displayPolar, displaySpec: state.displaySpec,
     exports: state.exports, outDir: state.outDir, outLabel: state.outLabel,
@@ -189,7 +192,7 @@ function loadSettings() {
     if (s.speaker) state.speaker = s.speaker;
     if (s.f0) { state.f0 = s.f0; state.f0Edited = true; }
     if (s.timings) { state.timings = s.timings; state.customTimings = true; }
-    for (const k of ['expressive', 'engine', 'ortho', 'outputMode', 'displayPolar', 'displaySpec', 'exports', 'outDir', 'outLabel']) {
+    for (const k of ['expressive', 'engine', 'ortho', 'outputMode', 'displayPolar', 'displaySpec', 'exports', 'outDir', 'outLabel', 'sandhi', 'sandhiMode']) {
       if (s[k] !== undefined && s[k] !== null) state[k] = s[k];
     }
     if (s.guardPolicy) state.guardPolicy = s.guardPolicy;
@@ -298,6 +301,16 @@ function bindControls() {
   $('#chk-expressive').addEventListener('change', (e) => {
     state.expressive = e.target.checked;
     $('#breath-ms').textContent = state.expressive ? '≈130 ms' : '— (expressive off)';
+    saveSettings();
+    convert();
+  });
+  $('#sel-sandhi').addEventListener('change', (e) => {
+    state.sandhi = e.target.value;
+    saveSettings();
+    convert();               // the level changes the text→SAMPA output
+  });
+  $('#sel-sandhi-mode').addEventListener('change', (e) => {
+    state.sandhiMode = e.target.value;
     saveSettings();
     convert();
   });
@@ -647,6 +660,7 @@ async function convert() {
     const out = await api.preview({
       text: src, mode: state.mode === 'ortho' ? 'ortho' : 'phonetic',
       lang: state.lang, expressive: state.expressive,
+      sandhi: state.sandhi, sandhiMode: state.sandhiMode,
     });
     if (seq !== previewSeq) return;      // stale response guard
     state.preview = out;
@@ -851,6 +865,7 @@ function synthPayload(source) {
       outputMode: state.outputMode, guardPolicy: state.guardPolicy,
       outputDir: state.outDir, label: state.outLabel || null,
       exports: state.exports,
+      sandhi: state.sandhi, sandhiMode: state.sandhiMode,
       _via: 'phonetic (compiler-edited blocks — your compiled structure)',
     };
   }
@@ -866,6 +881,7 @@ function synthPayload(source) {
       outputMode: state.outputMode, guardPolicy: state.guardPolicy,
       outputDir: state.outDir, label: state.outLabel || null,
       exports: state.exports,
+      sandhi: state.sandhi, sandhiMode: state.sandhiMode,
       _via: 'phonetic (the exact edited SAMPA)',
     };
   }
@@ -884,6 +900,7 @@ function synthPayload(source) {
     outputDir: state.outDir,
     label: state.outLabel || null,
     exports: state.exports,
+    sandhi: state.sandhi, sandhiMode: state.sandhiMode,
     _via: orthoIntact ? 'ortho (G2P deterministic — same SAMPA as preview)' : 'phonetic (the exact previewed/edited SAMPA)',
   };
 }
@@ -1131,6 +1148,38 @@ function setBackendChip() {
     dot.className = 'dot err';
     label.textContent = 'backend offline — demo mode';
     $('#demo-banner').style.display = '';
+  }
+  updateSandhiCapability();
+}
+
+/* reflect the bridge's covtl-sandhi capability on the Prosody controls —
+   the rule package (Branch B) may be absent: the selects stay usable but
+   a chosen level then degrades to off with a warning (server-side too) */
+function updateSandhiCapability() {
+  const cap = api.health?.sandhi || api.status?.sandhi || null;
+  const note = $('#sandhi-note');
+  const available = cap ? cap.available : null;
+  if (note) {
+    if (available === false) {
+      note.textContent = cap.reason || 'covtl-sandhi rule package not installed — levels degrade to off.';
+      note.classList.add('warn');
+    } else if (available === true && cap.languages?.length) {
+      note.textContent = `Cross-word sandhi (liaison) — rule modules: ${cap.languages.join(', ')}. ` +
+        'Levels are a monotone coverage filter (minimal ⊆ standard ⊆ careful); the level acts at the text→SAMPA stage.';
+      note.classList.remove('warn');
+    }
+  }
+  if (available === true && cap.levels?.length) {
+    for (const opt of $('#sel-sandhi').options) {
+      opt.disabled = !cap.levels.includes(opt.value);
+    }
+    for (const opt of $('#sel-sandhi-mode').options) {
+      opt.disabled = !cap.modes?.includes(opt.value);
+    }
+    if (!cap.levels.includes(state.sandhi)) {
+      state.sandhi = 'off';
+      $('#sel-sandhi').value = 'off';
+    }
   }
 }
 

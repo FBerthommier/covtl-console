@@ -182,3 +182,33 @@ def test_cancel_queued_job(client, S):
     assert r.status_code == 200
     assert r.json()["state"] == "cancelled"
     assert S.JOBS[job_id]["state"] == "cancelled"
+
+
+def test_sandhi_echo_and_degradation_note(client, S):
+    """The echo carries the requested sandhi level/mode; without the
+    Branch B rule package a degradation note lands in the echo (the
+    Pipeline itself degrades to off, bit-identical output)."""
+    from vtl_synth.utils import sandhi as hook
+    kw = {"text": "ba da", "sandhi": "standard", "outputDir": _unique_dir(),
+          "label": "sandhiecho"}
+    out = _run(client, **kw)
+    assert out["echo"]["sandhi"] == "standard"
+    assert out["echo"]["sandhi_mode"] == "g2p"
+    job = _wait_done(S, out["job_id"])
+    assert job["state"] == "done", job.get("error")
+    if not getattr(hook, "SANDHI_FULL", False):
+        assert "covtl-sandhi" in (out["echo"].get("sandhi_note") or "")
+
+
+def test_sandhi_level_separates_synth_cache(client, S):
+    """off vs standard are different parameter sets — no cache collision
+    even though both produce identical audio without Branch B."""
+    common = {"text": "ba da", "outputDir": _unique_dir(), "label": "sandhicast"}
+    first = _run(client, **common)
+    _wait_done(S, first["job_id"])
+    again_off = _run(client, **common)
+    assert again_off["cached"] is True and again_off["job_id"] == first["job_id"]
+    std = _run(client, **common, sandhi="standard")
+    assert std["cached"] is False and std["job_id"] != first["job_id"]
+    job = _wait_done(S, std["job_id"])
+    assert job["state"] == "done", job.get("error")

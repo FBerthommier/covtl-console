@@ -136,11 +136,28 @@
           <input type="checkbox" id="chk-expressive">
           <span>Expressive prosody <kbd class="mini">--expressive</kbd></span>
         </label>
+        <label class="field"><span>Cross-word sandhi <kbd class="mini">--sandhi</kbd></span>
+          <select id="sel-sandhi">
+            <option value="off">off — no cross-word rules</option>
+            <option value="minimal">minimal — categorical rules only</option>
+            <option value="standard">standard — recommended</option>
+            <option value="careful">careful — hyperarticulate</option>
+          </select></label>
+        <label class="field"><span>Sandhi mode <kbd class="mini">--sandhi-mode</kbd></span>
+          <select id="sel-sandhi-mode">
+            <option value="g2p">g2p — liaison-aware gateway (recommended)</option>
+            <option value="post">post — SAMPA post-processor</option>
+            <option value="pre">pre — orthographic rewrite</option>
+          </select></label>
         <dl class="info-list">
           <dt>Breath pause “%”</dt><dd id="breath-ms" class="mono">— (expressive off)</dd>
         </dl>
-        <p class="hint">Adds breathing groups and an F0 contour (declination, re-attacks, pitch accents).
-          Touches only the glottis f0 column and pause durations — composes with any speaker.</p>
+        <p class="hint">Expressive: breathing groups and an F0 contour (declination, re-attacks,
+          pitch accents) — touches only the glottis f0 column and pause durations.</p>
+        <p class="hint" id="sandhi-note">Cross-word sandhi = liaison (fr <span class="mono">faut il → fo.til</span>,
+          en <span class="mono">a apple → @.na.p@l</span>, it raddoppiamento, es enlace, pt encadeamento,
+          de Glottalversatz). Needs the <span class="mono">covtl-sandhi</span> rule package on the engine;
+          without it the level degrades to <span class="mono">off</span> with a warning.</p>
       </section>
 
       <section class="group" id="grp-engine">

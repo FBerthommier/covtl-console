@@ -55,6 +55,7 @@ export function synthCacheKey(p) {
     p.text, p.mode, p.lang, p.speaker, p.f0,
     [p.timings.tcons, p.timings.tvoy, p.timings.tpause, p.timings.tpauseLong],
     p.expressive, p.engine, p.ortho, p.outputMode, p.exports ?? true, p.label ?? null, p.outputDir ?? 'out',
+    p.sandhi ?? 'off', p.sandhiMode ?? 'g2p',
   ]);
 }
 
@@ -157,8 +158,9 @@ export const api = {
   },
 
   /* ── preview stack in ONE call — the cheap half of the pipeline ── */
-  async preview({ text, sampa = null, mode = 'ortho', lang, expressive }) {
-    const key = JSON.stringify([text ?? '', sampa ?? '', mode, lang, expressive]);
+  async preview({ text, sampa = null, mode = 'ortho', lang, expressive,
+                  sandhi = 'off', sandhiMode = 'g2p' }) {
+    const key = JSON.stringify([text ?? '', sampa ?? '', mode, lang, expressive, sandhi, sandhiMode]);
     const hit = previewCache.get(key);
     if (hit) {
       cacheStats.previewHits += 1;
@@ -168,7 +170,8 @@ export const api = {
     if (this.mode === 'live') {
       const r = await jfetch('/api/preview', {
         method: 'POST',
-        body: JSON.stringify({ text, sampa, mode, lang, expressive }),
+        body: JSON.stringify({ text, sampa, mode, lang, expressive,
+                               sandhi, sandhi_mode: sandhiMode }),
       }, 20000);
       out = {
         g2pString: r.g2p_string,
@@ -208,6 +211,10 @@ export const api = {
         rejected: enrichRejected(unknownSymbols(enriched)),
         language: lang, lexicon: null, inventoryDigest: null, live: false,
       };
+      if (sandhi !== 'off') {
+        out.warnings = [...out.warnings,
+          'demo mode: the cross-word sandhi level is not applied (no engine)'];
+      }
     }
     cacheSet(previewCache, key, out, PREVIEW_CACHE_MAX);
     return { ...out, cached: false };
@@ -282,7 +289,9 @@ export const api = {
     const echo = start.echo || {};
     onLog?.(`[job ${jobId}] lang=${echo.lang} speaker=${echo.speaker} engine=${echo.engine}` +
       ` ortho=${echo.ortho} expressive=${echo.expressive} guard=${echo.guard}` +
-      ` Tcons=${echo.tcons} Tvoy=${echo.tvoy} tpause=${echo.tpause} tpause-long=${echo.tpause_long}`);
+      ` Tcons=${echo.tcons} Tvoy=${echo.tvoy} tpause=${echo.tpause} tpause-long=${echo.tpause_long}` +
+      ` sandhi=${echo.sandhi || 'off'}/${echo.sandhi_mode || 'g2p'}`);
+    if (echo.sandhi_note) onLog?.(`⚠ ${echo.sandhi_note}`);
     if (start.cached) onLog?.(`server cache hit — job ${jobId} reused (identical parameters)`);
     let polarFetched = false;
     let lastPolar = null;

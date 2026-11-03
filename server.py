@@ -89,6 +89,43 @@ try:
 except Exception as exc:                                   # pragma: no cover
     _import_errors.append(f"{type(exc).__name__}: {exc}")
 
+# Cross-word sandhi (covtl-sandhi) — guarded capability probe. The engine
+# ships Branch A (the hook + a stub whose every entry point is the
+# identity, SANDHI_FULL=False); the RULES live in the companion package
+# (Branch B — https://github.com/FBerthommier/covtl-sandhi), resolved by
+# the same two states the engine's Pipeline accepts: copied over the stub
+# or pip-installed (top-level 'sandhi' import). SANDHI stays None until a
+# rule package is actually present: every consumer then degrades with a
+# clear message instead of crashing the bridge — mirrors the engine's own
+# degradation (requested level -> off + warning, bit-identical outputs).
+SANDHI = None
+try:
+    from vtl_synth.utils import sandhi as _sandhi_hook
+    _sandhi_pkg = _sandhi_hook
+    if not getattr(_sandhi_pkg, "SANDHI_FULL", False):
+        try:
+            import sandhi as _sandhi_full              # pip covtl-sandhi
+            _sandhi_pkg = _sandhi_full
+        except Exception:
+            pass
+    if getattr(_sandhi_pkg, "SANDHI_FULL", False):
+        SANDHI = _sandhi_pkg
+except Exception:
+    SANDHI = None
+
+
+def sandhi_capability() -> Dict[str, Any]:
+    """What the bridge can offer for cross-word sandhi (liaison)."""
+    if SANDHI is None:
+        return {"available": False, "levels": ["off"], "modes": ["g2p"],
+                "languages": [],
+                "reason": "covtl-sandhi rule package (Branch B) not "
+                          "installed on the engine — levels degrade to "
+                          "'off' with a warning"}
+    return {"available": True, "levels": list(SANDHI.SANDHI_LEVELS),
+            "modes": list(SANDHI.SANDHI_MODES),
+            "languages": sorted(SANDHI.SANDHI_LANGS)}
+
 SPEAKERS = [
     {"id": "jd3", "name": "JD3", "origin": "reference (SynthVTL24b original)", "f0": 102.216},
     {"id": "s1",  "name": "S1",  "origin": "DVTD MRI subject 1 (male), calibrated v3", "f0": 114.908},
@@ -599,6 +636,8 @@ class PreviewRequest(BaseModel):
     lang: str = "en"
     expressive: bool = False
     policy: Optional[str] = None         # informational; policy never changes spans
+    sandhi: str = "off"                  # cross-word sandhi level (covtl-sandhi)
+    sandhi_mode: str = "g2p"             # gateway implementation
 
 
 class GuardRequest(BaseModel):
@@ -612,6 +651,8 @@ class CompileRequest(BaseModel):
     timings: Dict[str, float] = {}
     guard_policy: str = "warn"
     expressive: bool = False             # accepted for key symmetry; breath via '%'
+    sandhi: str = "off"                  # accepted for symmetry; SAMPA has no
+    sandhi_mode: str = "g2p"             #   orthography — a level yields a warning
 
 
 class SynthRequest(BaseModel):
@@ -629,6 +670,8 @@ class SynthRequest(BaseModel):
     outputDir: str = "out"
     label: Optional[str] = None
     exports: bool = True                 # keep tract/polar/txt offered as downloads
+    sandhi: str = "off"                  # cross-word sandhi level (covtl-sandhi)
+    sandhi_mode: str = "g2p"
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -648,7 +691,64 @@ SYNTH_HITS = {"n": 0}
 
 
 def preview_key(req: PreviewRequest) -> Tuple:
-    return (req.text or "", req.sampa or "", req.mode, req.lang, bool(req.expressive))
+    return (req.text or "", req.sampa or "", req.mode, req.lang,
+            bool(req.expressive), str(req.sandhi or "off").lower(),
+            str(req.sandhi_mode or "g2p").lower())
+
+
+SANDHI_LEVELS = ("off", "minimal", "standard", "careful")
+SANDHI_MODES = ("g2p", "post", "pre")
+
+
+def _resolve_sandhi(req: PreviewRequest, warnings: List[str]
+                    ) -> Tuple[str, str]:
+    """Validate the requested level/mode and degrade with a clear
+    warning, never silently — mirrors Pipeline.run's degradation order:
+    off for phonetic input (no orthography), off when the covtl-sandhi
+    rule package (Branch B) is missing, off for languages without a
+    rule module."""
+    level = str(req.sandhi or "off").lower()
+    mode = str(req.sandhi_mode or "g2p").lower()
+    if level not in SANDHI_LEVELS:
+        raise HTTPException(422, f"sandhi must be one of "
+                                 f"{'/'.join(SANDHI_LEVELS)}, got {req.sandhi!r}")
+    if mode not in SANDHI_MODES:
+        raise HTTPException(422, f"sandhi_mode must be one of "
+                                 f"{'/'.join(SANDHI_MODES)}, got {req.sandhi_mode!r}")
+    if level == "off":
+        return level, mode
+    if req.sampa is not None or req.mode == "phonetic":
+        warnings.append("sandhi ignored: the input is a phonetic SAMPA "
+                        "string — the level applies to the text→SAMPA "
+                        "(G2P) stage")
+        return "off", mode
+    if SANDHI is None:
+        warnings.append("covtl-sandhi rule package (Branch B) not "
+                        "installed on the engine — sandhi "
+                        f"{level!r} degrades to 'off'")
+        return "off", mode
+    if not SANDHI.sandhi_supported(req.lang):
+        warnings.append(f"sandhi {level!r} ignored: no rule module for "
+                        f"{req.lang!r} "
+                        f"({'/'.join(sorted(SANDHI.SANDHI_LANGS))})")
+        return "off", mode
+    return level, mode
+
+
+def _apply_sandhi_ortho(req: PreviewRequest, text: str, level: str,
+                        mode: str, profile, warnings: List[str]):
+    """Text → SAMPA through the sandhi gateways — the exact monotone
+    path of Pipeline.run (g2p gateway / post-processor / pre rewrite)."""
+    g2p = profile.g2p_callable
+    if mode == "g2p":
+        # the gateway owns the g2p view: per-word oracle + pair merge
+        return SANDHI.apply_sandhi_text(req.lang, text, g2p, level,
+                                        "g2p", warnings)
+    raw = g2p(text, warnings=warnings)
+    if mode == "post":
+        return SANDHI.apply_sandhi_text(req.lang, text, g2p, level,
+                                        "post", warnings)
+    return raw
 
 
 def synth_key(req: SynthRequest) -> str:
@@ -666,6 +766,8 @@ def synth_key(req: SynthRequest) -> str:
         "engine": req.engine, "ortho": req.ortho, "outputMode": req.outputMode,
         "exports": req.exports,
         "label": req.label, "outputDir": req.outputDir,
+        "sandhi": str(req.sandhi or "off").lower(),
+        "sandhi_mode": str(req.sandhi_mode or "g2p").lower(),
     }
     blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()
@@ -703,7 +805,8 @@ def health() -> Dict[str, Any]:
             pass
     return {"status": status, "engine_version": engine_version,
             "bridge": "3.0.0", "active_speaker": active_speaker,
-            "active_lang": active_lang, "registry_warnings": warnings}
+            "active_lang": active_lang, "registry_warnings": warnings,
+            "sandhi": sandhi_capability()}
 
 
 @app.get("/api/languages")
@@ -782,6 +885,7 @@ def status() -> Dict[str, Any]:
             pass
         lex.setdefault("en", "cmudict")
         info["lexicons"] = lex
+    info["sandhi"] = sandhi_capability()
     return info
 
 
@@ -813,6 +917,7 @@ def preview(req: PreviewRequest) -> Dict[str, Any]:
     groups: List[Dict[str, Any]] = []
     g2p_string: Optional[str] = None
     words: List[Dict[str, Any]] = []
+    sandhi_level, sandhi_mode = _resolve_sandhi(req, warnings)
 
     if req.sampa is not None:
         sampa = req.sampa
@@ -827,23 +932,51 @@ def preview(req: PreviewRequest) -> Dict[str, Any]:
     else:
         profile = _profile(req.lang)
         raw_warnings: List[str] = []
-        raw = profile.g2p_callable(req.text or "", warnings=raw_warnings)
-        g2p_string = raw
+        # sandhi 'pre' rewrites the orthography BEFORE the g2p stage —
+        # both the expressive and the monotone path get it (Pipeline.run)
+        text_in = req.text or ""
+        if sandhi_level != "off" and sandhi_mode == "pre":
+            text_in = SANDHI.sandhi_rewrite_text(
+                req.lang, text_in, profile.g2p_callable, sandhi_level,
+                warnings)
         if req.expressive:
             try:
                 from vtl_synth.utils.prosody_f0 import plan_expressive_text
+                plan_g2p = profile.g2p_callable
+                if sandhi_level != "off" and sandhi_mode == "g2p":
+                    # the gateway owns the per-word g2p view (closed-class
+                    # fixes) — same construction as Pipeline.run
+                    plan_g2p = (lambda gp: (lambda w, warnings=None, **kw:
+                                            SANDHI.sandhi_oracle(
+                                                req.lang, w, gp)))(
+                                                profile.g2p_callable)
                 sampa, _plans = plan_expressive_text(
-                    req.text or "", req.lang, profile.g2p_callable,
+                    text_in, req.lang, plan_g2p,
                     getattr(profile, "expressivity", None), warnings)
+                if sandhi_level != "off" and sandhi_mode in ("g2p", "post"):
+                    sampa = SANDHI.apply_sandhi_sampa(
+                        req.lang, text_in, sampa, profile.g2p_callable,
+                        sandhi_level, sandhi_mode, warnings)
             except Exception as exc:
                 warnings.append(f"expressive preview unavailable ({exc}); monotone path used")
-                sampa = raw
+                sampa = profile.g2p_callable(text_in, warnings=raw_warnings)
             warnings.extend(w for w in raw_warnings if w not in warnings)
+            g2p_string = sampa
+        elif sandhi_level != "off":
+            sampa = _apply_sandhi_ortho(req, text_in, sandhi_level,
+                                        sandhi_mode, profile, warnings)
+            raw = sampa                    # the gateway output IS the g2p view
+            g2p_string = raw
         else:
-            sampa = raw
+            sampa = profile.g2p_callable(text_in, warnings=raw_warnings)
             warnings.extend(raw_warnings)
-        g2p_string = raw
-        words = _word_chips(req.text or "", profile, raw_warnings)
+            g2p_string = sampa
+        words = _word_chips(req.text or "", profile, raw_warnings,
+                            g2p_override=(
+                                lambda w: SANDHI.sandhi_oracle(
+                                    req.lang, w, profile.g2p_callable))
+                            if sandhi_level != "off" and SANDHI is not None
+                            and sandhi_mode == "g2p" else None)
 
     enriched = sampa
     if req.expressive:
@@ -910,7 +1043,8 @@ def _groups_from_sampa(sampa: str) -> List[Dict[str, Any]]:
     return groups
 
 
-def _word_chips(text: str, profile, warnings: List[str]) -> List[Dict[str, Any]]:
+def _word_chips(text: str, profile, warnings: List[str],
+                g2p_override=None) -> List[Dict[str, Any]]:
     unknown = set(re.findall(r"kept verbatim\): '([^']+)'", " ".join(warnings)))
     words = re.findall(r"[A-Za-zÀ-ɏ'’]+", text)
     out = []
@@ -920,7 +1054,8 @@ def _word_chips(text: str, profile, warnings: List[str]) -> List[Dict[str, Any]]
             out.append({"word": w, "sampa": key, "known": False})
             continue
         try:
-            sampa = profile.g2p_callable(w, warnings=[])
+            g2p = g2p_override or profile.g2p_callable
+            sampa = g2p(w, warnings=[])
             sampa = sampa.replace(" | ", " ").strip()
         except Exception:
             sampa = key
@@ -976,7 +1111,9 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
                          "vtl_synth not installed — the syllable compiler needs the "
                          "engine's syltraj walk (demo mode offers an approximate one).",
                          hint="Start the bridge on a machine with covtl-pipeline installed.")
-    key = (req.text, req.lang, json.dumps(req.timings, sort_keys=True))
+    key = (req.text, req.lang, json.dumps(req.timings, sort_keys=True),
+           str(req.sandhi or "off").lower(),
+           str(req.sandhi_mode or "g2p").lower())
     hit = COMPILE_CACHE.get(key)
     if hit is not None:
         COMPILE_CACHE.move_to_end(key)
@@ -993,6 +1130,15 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
         return guard_error(rejected)
 
     warnings: List[str] = []
+    if str(req.sandhi or "off").lower() != "off":
+        # honest no-op notice: the compiler consumes SAMPA blocks, which
+        # carry no orthography — the cross-word sandhi level acts at the
+        # text→SAMPA stage (preview / synthesize). A liaison consonant
+        # inserted there shows up in the plan like any onset cluster.
+        warnings.append(
+            "sandhi level ignored: the compiler takes SAMPA blocks — "
+            "the cross-word sandhi level applies to the text→SAMPA "
+            "stage (preview / synthesize)")
     breath_ms: Optional[float] = BREATH_MS if "%" in src else None
     try:
         st = structure_compile(src, req.lang, req.timings, breath_ms)
@@ -1068,6 +1214,7 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
         "rejected_symbols": rejected,
         "warnings": warnings,
         "inventory_digest": inventory_digest(),
+        "sandhi": sandhi_capability(),
         "cache": False,
     }
     COMPILE_CACHE[key] = out
@@ -1119,10 +1266,20 @@ def synthesize(req: SynthRequest) -> Dict[str, Any]:
 
     job_id = uuid.uuid4().hex[:12]
     t = _timings_of(req.lang, req.timings)
+    sandhi_level = str(req.sandhi or "off").lower()
+    sandhi_mode = str(req.sandhi_mode or "g2p").lower()
     echo = {"lang": req.lang, "speaker": req.speaker, "engine": req.engine,
             "ortho": req.ortho, "expressive": req.expressive, "guard": req.guardPolicy or "warn",
             "tcons": t["tcons"], "tvoy": t["tvoy"], "tpause": t["tpause"],
-            "tpause_long": t["tpauseLong"], "engine_version": ENGINE_VERSION}
+            "tpause_long": t["tpauseLong"], "engine_version": ENGINE_VERSION,
+            "sandhi": sandhi_level, "sandhi_mode": sandhi_mode}
+    if sandhi_level != "off" and SANDHI is None:
+        # same degradation the engine will print — surfaced in the job
+        # payload so the UI shows it without reading server stdout
+        echo["sandhi_note"] = (
+            "covtl-sandhi rule package (Branch B) not installed: "
+            f"sandhi {sandhi_level!r} degrades to 'off' "
+            "(bit-identical output)")
     job = {"id": job_id, "state": "queued", "stage": "g2p", "progress": 0.0,
            "created": time.time(), "error": None, "error_class": None, "error_hint": None,
            "result": None, "cancelled": False, "cache_key": key, "echo": echo,
@@ -1136,10 +1293,44 @@ def synthesize(req: SynthRequest) -> Dict[str, Any]:
 
 
 def _resolve_sampa(req: SynthRequest, warnings: List[str]) -> str:
-    """Same G2P path as /api/preview and Pipeline.run (engine callables)."""
+    """Same G2P path as /api/preview and Pipeline.run (engine callables).
+
+    When a cross-word sandhi level is requested, the SAME gateways as
+    Pipeline.run are applied here — the early polar stage must see the
+    SAMPA the engine will actually speak (compile plan == synth plan)."""
     if req.mode == "phonetic":
         return (req.text or "").strip()
     profile = _profile(req.lang)
+    g2p = profile.g2p_callable
+    text = req.text or ""
+    level = str(getattr(req, "sandhi", "off") or "off").lower()
+    mode = str(getattr(req, "sandhi_mode", "g2p") or "g2p").lower()
+    if level != "off" and SANDHI is not None:
+        if mode == "pre":
+            text = SANDHI.sandhi_rewrite_text(req.lang, text, g2p, level,
+                                              warnings)
+        if req.expressive:
+            plan_g2p = g2p
+            if mode == "g2p":
+                plan_g2p = (lambda gp: (lambda w, warnings=None, **kw:
+                                        SANDHI.sandhi_oracle(req.lang, w,
+                                                             gp)))(g2p)
+            from vtl_synth.utils.prosody_f0 import plan_expressive_text
+            sampa, _plans = plan_expressive_text(
+                text, req.lang, plan_g2p,
+                getattr(profile, "expressivity", None), warnings)
+            if mode in ("g2p", "post"):
+                sampa = SANDHI.apply_sandhi_sampa(req.lang, text, sampa,
+                                                  g2p, level, mode, warnings)
+            return sampa
+        if mode == "g2p":
+            return SANDHI.apply_sandhi_text(req.lang, text, g2p, level,
+                                            "g2p", warnings)
+        sampa = g2p(text, warnings=warnings)
+        if mode == "post":
+            sampa = SANDHI.apply_sandhi_text(req.lang, text, g2p, level,
+                                             "post", warnings)
+        return sampa
     if req.expressive:
         from vtl_synth.utils.prosody_f0 import plan_expressive_text
         sampa, _plans = plan_expressive_text(
@@ -1167,6 +1358,14 @@ def _worker(job_id: str, req: SynthRequest) -> None:
         if "lang" in sig: kwargs["lang"] = req.lang
         if "expressive" in sig and req.expressive and req.mode == "ortho":
             kwargs["expressive"] = True
+        # sandhi options exist only when the engine carries the
+        # covtl-sandhi hook (Branch A); a level without the Branch B
+        # rule package is passed through anyway — the Pipeline itself
+        # degrades to off with a printed warning (bit-identical output)
+        if "sandhi" in sig and str(getattr(req, "sandhi", "off") or "off").lower() != "off":
+            kwargs["sandhi"] = str(req.sandhi).lower()
+        if "sandhi_mode" in sig and str(getattr(req, "sandhi_mode", "g2p") or "g2p").lower() != "g2p":
+            kwargs["sandhi_mode"] = str(req.sandhi_mode).lower()
         t = _timings_of(req.lang, req.timings)
         if "t_cons_ms" in sig: kwargs["t_cons_ms"] = t["tcons"]
         if "t_voy_ms" in sig: kwargs["t_voy_ms"] = t["tvoy"]

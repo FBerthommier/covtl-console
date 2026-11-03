@@ -195,6 +195,70 @@ def test_compile_h_pairs_labels(client):
 
 
 @requires_engine
+def test_sandhi_capability_in_status_and_health(client):
+    """The bridge exposes its covtl-sandhi capability (Branch A hook +
+    Branch B rule package state) on /api/status and /api/health — the UI
+    derives its controls from it."""
+    for path in ("/api/status", "/api/health"):
+        r = client.get(path)
+        assert r.status_code == 200
+        cap = r.json()["sandhi"]
+        assert isinstance(cap["available"], bool)
+        assert "off" in cap["levels"]
+        assert "g2p" in cap["modes"]
+
+
+@requires_engine
+def test_preview_sandhi_degrades_without_branch_b(client):
+    """A requested level without the rule package degrades to off with a
+    clear warning — the SAMPA stays the plain G2P output (never a silent
+    change, never a crash)."""
+    base = client.post("/api/preview", json={
+        "text": "faut il", "mode": "ortho", "lang": "fr"}).json()
+    r = client.post("/api/preview", json={
+        "text": "faut il", "mode": "ortho", "lang": "fr",
+        "sandhi": "standard", "sandhi_mode": "g2p"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["final_sampa"] == base["final_sampa"], \
+        "without Branch B the level must be a no-op on the SAMPA"
+    assert any("covtl-sandhi" in w for w in body["warnings"]), body["warnings"]
+    assert not body["cache"] and base.get("cache") in (False, True)
+
+
+@requires_engine
+def test_preview_sandhi_invalid_level_422(client):
+    r = client.post("/api/preview", json={
+        "text": "hello", "mode": "ortho", "lang": "en", "sandhi": "bogus"})
+    assert r.status_code == 422
+    r2 = client.post("/api/preview", json={
+        "text": "hello", "mode": "ortho", "lang": "en", "sandhi_mode": "bogus"})
+    assert r2.status_code == 422
+
+
+@requires_engine
+def test_preview_sandhi_ignored_on_phonetic(client):
+    """Phonetic SAMPA carries no orthography — a requested level is
+    ignored with a warning, mirroring Pipeline.run."""
+    r = client.post("/api/preview", json={
+        "text": "ta ta", "mode": "phonetic", "lang": "en",
+        "sandhi": "standard"})
+    assert r.status_code == 200
+    assert any("ignored" in w for w in r.json()["warnings"])
+
+
+@requires_engine
+def test_compile_sandhi_level_warns_noop(client):
+    """The compiler consumes SAMPA blocks: a sandhi level is a documented
+    no-op there (the level acts at the text→SAMPA stage)."""
+    r = client.post("/api/compile", json={
+        "text": "ta.ta", "lang": "en", "sandhi": "standard"})
+    assert r.status_code == 200
+    assert any("text→SAMPA" in w for w in r.json()["warnings"])
+    assert r.json()["sandhi"]["levels"]  # capability carried for the UI
+
+
+@requires_engine
 def test_error_envelope_shape(client):
     r = client.post("/api/compile", json={
         "text": "cleanpan", "lang": "en", "guard_policy": "error"})
