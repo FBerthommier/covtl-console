@@ -10,6 +10,11 @@ from pathlib import Path
 
 import pytest
 
+try:
+    import tomllib                                  # py3.11+
+except ModuleNotFoundError:                          # pragma: no cover
+    tomllib = None
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -21,6 +26,7 @@ def test_package_layout():
     assert (pkg / "ui" / "css" / "app.css").is_file()
 
 
+@pytest.mark.skipif(tomllib is None, reason="tomllib needs Python 3.11+")
 def test_pyproject_declares_flash_install():
     import tomllib                                            # py3.11+
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(
@@ -46,6 +52,7 @@ def test_shim_resolves_to_implementation():
     assert callable(impl.main)
 
 
+@pytest.mark.skipif(tomllib is None, reason="tomllib needs Python 3.11+")
 def test_package_version_matches_pyproject():
     import tomllib
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(
