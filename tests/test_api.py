@@ -166,6 +166,35 @@ def test_compile_labels_nasal_hiatus(client):
 
 
 @requires_engine
+def test_compile_labels_merged_nasal_hiatus(client):
+    """V~.V~ (both members nasal): nasal_hiatus_intervals MERGES the two
+    adjacent nasal slots into one velar-open interval keyed on the oral
+    bases ('a+a') — the label must still show the nasal notation of the
+    run (a~.a~), never the merged key."""
+    r = client.post("/api/compile", json={
+        "text": "ta~.a~ta", "lang": "fr"})
+    assert r.status_code == 200
+    blocks = r.json()["blocks"]
+    hiatus = [b.get("hiatus") for b in blocks
+              if b["kind"] == "background" and b.get("hiatus")]
+    assert hiatus == ["a~.a~"], blocks
+    stretches = [s["stretch"] for s in r.json()["segments_preview"]]
+    assert "a~.a~" in stretches, stretches
+
+
+@requires_engine
+def test_compile_h_pairs_labels(client):
+    """The three H-pair hiatus typologies label the background arc with
+    the run's nasal notation in every direction."""
+    for text, want in (("ta~.ata", "a~.a"), ("ta.a~ta", "a.a~")):
+        r = client.post("/api/compile", json={"text": text, "lang": "fr"})
+        assert r.status_code == 200
+        hiatus = [b.get("hiatus") for b in r.json()["blocks"]
+                  if b["kind"] == "background" and b.get("hiatus")]
+        assert hiatus == [want], (text, r.json()["blocks"])
+
+
+@requires_engine
 def test_error_envelope_shape(client):
     r = client.post("/api/compile", json={
         "text": "cleanpan", "lang": "en", "guard_policy": "error"})

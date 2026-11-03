@@ -63,6 +63,7 @@ export function stretchLabel(blocks) {
     else if (b.kind === 'cluster' && b.cons_keys && b.cons_keys.length) {
       out += (sawVowel ? '‿' : '') + b.cons_keys.join('');
     }
+    else if (b.kind === 'background') out += (b.hiatus || '-');
     else if (b.breath) out += '%';
     else if (b.kind === 'pause') out += (b.long ? '|' : '␣');
     else if (b.kind === 'decay' || b.kind === 'attack') out += '·';

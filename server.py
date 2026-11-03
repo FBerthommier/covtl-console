@@ -410,11 +410,19 @@ def _instrumented_phrase_build(phrase: str, t_cons: int, t_voy: int,
             keys = [k for (t0, t1, k) in hiatus_intervals
                     if t0 < step + b.n_steps and t1 > step]
             if keys:
-                labels = [".".join(m["key"] + ("~" if m.get("nasal") else "")
-                                   for m in run)
-                          for run in (nasal_plan.get("runs") or [])
-                          if any(m["key"] in keys for m in run)]
-                rec["hiatus"] = " + ".join(labels) or "+".join(dict.fromkeys(keys))
+                # adjacent nasal members arrive MERGED into one interval
+                # (V~.V~: the velum stays open start-to-end) with their
+                # base keys joined by '+' — re-derive the nasal notation
+                # from the plan runs instead of showing the merged key
+                merged = "+".join(keys)
+                labels = []
+                for run in (nasal_plan.get("runs") or []):
+                    run_keys = "+".join(m["key"] for m in run)
+                    if any(m["key"] in keys for m in run) or run_keys == merged:
+                        labels.append(".".join(
+                            m["key"] + ("~" if m.get("nasal") else "")
+                            for m in run))
+                rec["hiatus"] = " + ".join(labels) or merged
         out_blocks.append(rec)
         step += b.n_steps
 
@@ -558,9 +566,9 @@ def build_segment_payload(job: Dict[str, Any], from_k: int = 0,
             "segment_index": k, "t0": round(a0["t"], 3), "t1": round(a1["t"], 3),
             "anchor_from": a0["i"], "anchor_to": a1["i"],
             "label_from": a0["label"], "label_to": a1["label"],
-            "blocks": [{kk: b[kk] for kk in ("kind", "n_steps", "cons_keys",
-                                             "vowel_key", "long", "breath",
-                                             "t0", "t1")}
+            "blocks": [{kk: b.get(kk) for kk in ("kind", "n_steps", "cons_keys",
+                                                 "vowel_key", "long", "breath",
+                                                 "hiatus", "t0", "t1")}
                        for b in span_blocks],
             "markers": markers,
             "points": points,

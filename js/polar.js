@@ -537,6 +537,28 @@ export class PolarStage {
       };
       journeyAnchor(seg.anchorFrom, COL.anchorFrom, false);
       journeyAnchor(seg.anchorTo, COL.anchorTo, true);
+      // hiatus journeys (a pure background diphthong arc between two
+      // vowel anchors — V1V2 nasal_preproc) carry no plateau and no
+      // cluster, so no phonetic label would ever be drawn: figure the
+      // engine's arrival anchor label (the oral base vowel — nasality
+      // is re-injected in the audio VO channel, not a geometry change)
+      // above the green target anchor so the arc is never unlabeled.
+      const pureBackground = !(seg.blocks || [])
+        .some((b) => b.kind === 'plateau' || b.kind === 'cluster');
+      const arr = this.payload.anchors[seg.anchorTo];
+      if (pureBackground && arr && arr.kind === 'V' && seg.labelTo) {
+        const idx = this._segIndexAt(seg, Math.min(arr.t, seg.t1));
+        if (idx >= 0) {
+          const p = this._branchAt(seg, idx);
+          const [x, y] = this._xy(p.rhoV, p.thetaV);
+          ctx.font = '600 12px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(10,13,18,0.85)';
+          ctx.strokeText(seg.labelTo, x, y - 14);
+          ctx.fillStyle = COL.v;
+          ctx.fillText(seg.labelTo, x, y - 14);
+        }
+      }
     }
 
     this._emitTick(tickData);
