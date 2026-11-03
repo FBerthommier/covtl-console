@@ -39,7 +39,15 @@ engine-dependent endpoint returns a structured 503; the UI then runs its
 browser demo engine (\texttt{js/demo-engine.js}) --- same interface,
 approximate behavior, labeled as demo.
 
-\subsection{Module map (\texttt{js/})}
+\subsection{Module map (\texttt{covtl\_console/ui/js/})}
+
+Since v3.1 the console is a pip package: the bridge implementation
+lives in \texttt{covtl\_console/server.py} (the UI assets it serves in
+\texttt{covtl\_console/ui/}; a repo-root \texttt{server.py} shim keeps
+\texttt{python server.py} and \texttt{import server} working), and the
+\texttt{covtl-console} entry point (\texttt{--host/--port}) starts it
+from a plain \texttt{pip install} — see the flash install in the
+README. Module map:
 
 \begin{longtable}{p{0.24\linewidth}p{0.70\linewidth}}
 \texttt{data.js} & Engine constants mirrored client-side: inventory,

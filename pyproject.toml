@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: 2026 Frédéric Berthommier
+# SPDX-License-Identifier: GPL-3.0-or-later
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "covtl-console"
+version = "3.1.0"
+description = "COVTL Lab Console — local web interface for covtl-pipeline (G2P preview, SAMPA guard, syllable compiler, continuous polar display)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Frédéric Berthommier"},
+]
+keywords = [
+    "articulatory synthesis",
+    "vocal tract",
+    "VocalTractLab",
+    "phonetics",
+    "speech synthesis",
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Environment :: Web Environment",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+# Flash install: pip resolves the whole chain — engine (binaries of
+# VocalTractLab included in its wheel), liaison rules, bridge deps.
+# Already-installed distributions satisfy these (no forced reinstall).
+dependencies = [
+    "vtl-synth @ git+https://github.com/FBerthommier/covtl-pipeline.git",
+    "covtl-sandhi @ git+https://github.com/FBerthommier/covtl-sandhi.git",
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "httpx",
+]
+
+[project.scripts]
+covtl-console = "covtl_console.server:main"
+
+[project.urls]
+Homepage = "https://github.com/FBerthommier/covtl-console"
+Engine = "https://github.com/FBerthommier/covtl-pipeline"
+SandhiRules = "https://github.com/FBerthommier/covtl-sandhi"
+
+[tool.setuptools]
+packages = ["covtl_console"]
+
+[tool.setuptools.package-data]
+covtl_console = [
+    "ui/index.html",
+    "ui/css/*",
+    "ui/js/*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

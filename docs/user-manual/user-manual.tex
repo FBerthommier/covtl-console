@@ -57,7 +57,13 @@ use a web browser and a media player, you can drive it.
 
 The console is a local web page served by a small Python bridge. Full
 per-system instructions (Windows, macOS, Linux, and the no-Python demo
-mode) live in the repository's \texttt{README.md}; in short:
+mode) live in the repository's \texttt{README.md}. \textbf{Flash
+route} (Python~3.9+): \texttt{pip install
+git+https://github.com/FBerthommier/covtl-console.git} then run
+\texttt{covtl-console} --- the engine (with its VocalTractLab
+binaries), the liaison rules and the bridge resolve automatically; on
+a locked-down machine, clone the repository and run
+\texttt{python install\_flash.py}. In short, by hand:
 
 \begin{enumerate}
 \item Install the engine: clone

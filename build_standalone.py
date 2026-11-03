@@ -19,6 +19,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+UI = ROOT / "covtl_console" / "ui"          # the UI ships inside the package
 ORDER = [  # dependency order (data first, app last)
     "js/data.js", "js/demo-engine.js", "js/render.js", "js/api.js",
     "js/polar.js", "js/spectrogram.js", "js/compiler.js", "js/app.js",
@@ -64,12 +65,12 @@ def transform(path: Path) -> tuple[str, list[str]]:
 
 
 def build() -> Path:
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
-    css = (ROOT / "css" / "app.css").read_text(encoding="utf-8")
+    html = (UI / "index.html").read_text(encoding="utf-8")
+    css = (UI / "css" / "app.css").read_text(encoding="utf-8")
 
     modules = []
     for rel in ORDER:
-        body, exports = transform(ROOT / rel)
+        body, exports = transform(UI / rel)
         name = Path(rel).stem
         ret = ", ".join(f"{e}: {e}" for e in dict.fromkeys(exports))
         modules.append(

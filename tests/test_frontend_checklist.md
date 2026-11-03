@@ -21,6 +21,14 @@ must read **live**.
 
 ## Preview (step 1)
 
+- [ ] **Flash install (pip package)**: in a scratch venv, `pip install .`
+      resolves the engine + covtl-sandhi + fastapi/uvicorn;
+      `covtl-console --port 8422` starts LIVE (fr, sandhi available,
+      six languages) and serves the UI from site-packages;
+      `python server.py` and `import server` from the repo still work
+      (root shim). `python install_flash.py` creates `.venv-covtl` and
+      writes `run_console.bat`/`run_console.sh`.
+
 - [ ] Word-end auto-preview fires when finishing a word (space / word
       boundary); typing **mid-word must NOT fire** a preview.
 - [ ] Preview button shows feedback: label becomes `⏳ Previewing…` and the

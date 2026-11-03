@@ -17,7 +17,12 @@ temp_video/
 # Local environments
 .venv/
 venv/
+.venv-covtl/
+run_console.bat
+run_console.sh
 node_modules/
+build/
+*.egg-info/
 
 # LaTeX build intermediates (PDFs under docs/ ARE committed)
 docs/**/*.aux

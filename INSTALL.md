@@ -3,8 +3,18 @@
 
 # Quick install
 
-Three commands and a browser. Details, edge cases and the full
-per-system matrix live in the [README](README.md#installation--every-system).
+**Flash (one command, Python 3.9+):**
+`pip install git+https://github.com/FBerthommier/covtl-console.git` then
+run **`covtl-console`** — the engine (VocalTractLab binaries included in
+its wheel), the covtl-sandhi liaison rules and the bridge are resolved
+automatically. Locked-down box or portable Python: clone the repo and
+`python install_flash.py` (creates the venv, installs everything,
+writes a launcher; `--run` starts it).
+
+The classic step-by-step install below stays the way to go when you
+want a local engine checkout for development; details, edge cases and
+the full per-system matrix live in the
+[README](README.md#installation--every-system).
 
 ```bash
 # 1) the engine (anywhere)

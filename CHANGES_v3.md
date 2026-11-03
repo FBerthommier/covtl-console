@@ -215,3 +215,32 @@ console tracks both.
   le.za.mi`, and `comment allez-vous` → `kOma~.ta.le.vu` (the liaison
   [t] carries the transition — the V~.V hiatus becomes a plain
   cluster, which the compiled plan shows honestly).
+
+---
+
+## K. Addendum (2026-11-03, latest) — flash install (pip package + bootstrap)
+
+- **The console is a pip package** (`covtl-console` 3.1.0,
+  `pyproject.toml`): `pip install
+  git+https://github.com/FBerthommier/covtl-console.git` resolves the
+  whole chain — `vtl-synth` from GitHub (VocalTractLab binaries are in
+  its wheel), `covtl-sandhi` (liaison rules), `fastapi`/`uvicorn` —
+  and installs the `covtl-console` command (`--host`/`--port`).
+  Already-installed distributions satisfy the git-URL requirements, so
+  development checkouts (editable engine) are never clobbered.
+- **Packaging restructure**: bridge implementation moved to
+  `covtl_console/server.py` with the UI assets inside the package
+  (`covtl_console/ui/`, served by the bridge from site-packages);
+  artifacts land in `out/` under the current working directory; the
+  repo-root `server.py` is a shim that aliases `covtl_console.server`
+  in `sys.modules` so `python server.py`, `import server` and the
+  suite's monkeypatching keep working unchanged (verified: 49 fast
+  tests green).
+- **Bootstrap installer (option A)**: `install_flash.py` — creates a
+  venv, installs engine + rules + bridge + console, writes
+  `run_console.bat`/`run_console.sh`; options `--python`, `--venv`,
+  `--engine` (git URL or local checkout), `--no-sandhi`, `--run`.
+- **Flash install e2e-verified**: fresh venv, `pip install .` resolved
+  engine 1.1.0 + covtl-sandhi 0.1.0 + console 3.1.0 from GitHub,
+  `covtl-console --port 8422` came up LIVE (fr active, sandhi
+  available, six languages, UI served from site-packages).

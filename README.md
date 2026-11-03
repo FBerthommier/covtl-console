@@ -3,6 +3,12 @@
 
 # COVTL Lab Console — local laboratory interface for covtl-pipeline
 
+> ⚡ **Flash install — one command, everything included** (engine +
+> liaison rules + bridge, Python 3.9+):
+> `pip install git+https://github.com/FBerthommier/covtl-console.git` —
+> then run **`covtl-console`** and open http://127.0.0.1:8421 ·
+> locked-down box? → `python install_flash.py`
+
 The COVTL Lab Console is a **local web interface** for the open-source
 articulatory speech engine [covtl-pipeline](https://github.com/FBerthommier/covtl-pipeline)
 (`vtl_synth`, CLI `vtl-synth`), which wraps VocalTractLab 2.4. It gives
@@ -110,6 +116,42 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
 Without the engine the console still runs in **demo mode** (see below) —
 simulated G2P/guard/audio and an approximate compiler — clearly labeled as
 such in the UI.
+
+## Flash install
+
+Two equivalent routes to the same result (venv-ready bridge with engine,
+liaison rules, UI assets and launcher):
+
+**One command (option B)** — the console is a pip package whose
+dependencies resolve the whole chain (the engine wheel embeds the
+VocalTractLab binaries; `covtl-sandhi` brings the six rule languages):
+
+```bash
+pip install git+https://github.com/FBerthommier/covtl-console.git
+covtl-console                # → http://127.0.0.1:8421  (--port/--host available)
+```
+
+The UI ships inside the package (`covtl_console/ui/`) and is served by
+the bridge itself; synthesis artifacts land in `out/` under the current
+working directory.
+
+**Bootstrap script (option A)** — same install, step by step and
+tunable, for locked-down machines or portable Python (NuGet) boxes:
+
+```bash
+git clone https://github.com/FBerthommier/covtl-console.git
+cd covtl-console
+python install_flash.py            # creates .venv-covtl + writes run_console.*
+python install_flash.py --run      # ... and start it right away
+```
+
+`install_flash.py` options: `--python` (interpreter for the venv),
+`--venv` (target directory), `--engine` (git URL or a local checkout
+path for engine development), `--no-sandhi` (skip the liaison rules —
+the UI default `standard` level then degrades to `off` with a warning),
+`--run`. If the machine has no Python at all, see the no-Python demo
+mode below; to install Python itself on a locked-down Windows box, the
+NuGet portable package needs no admin rights (see the Windows section).
 
 ## Installation — every system
 
