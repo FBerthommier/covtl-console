@@ -125,13 +125,20 @@ function loadCompiledPolar(polar) {
     R.log('compile polar skipped — a synthesis job is running (its own trajectory will land)');
     return;
   }
+  // a synthesized display stays untouched: the compiled structure equals
+  // the synthesized one (same string, same engine), and replacing it would
+  // detach the audio the user is listening to
+  if (state.result && polarStage.hasData() && polarStage.mode === 'synced') {
+    R.log('compile response matches the synthesized audio — display kept');
+    return;
+  }
   state.polar = polar;
   polarStage.detachAudio();
   polarStage.setPayload(polar);
   polarStage.seek(0);
   buildScrubTicks();
   $('#polar-status').textContent =
-    'compiled structure — polar-only (no audio) · Synthesize attaches the sound';
+    'compiled structure — polar-only (no audio) · press Play to hear it';
   R.log(`compiled polar trajectories loaded: ${polar.segments.length} blocks / ${polar.anchors.length} anchors — display in polar-only mode`);
 }
 

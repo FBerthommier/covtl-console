@@ -132,6 +132,12 @@ export class PolarStage {
   /* ── transport ────────────────────────────────────────────────── */
   play() {
     if (!this.hasData()) return;
+    // the attached audio is ALWAYS played when present — even if the stage
+    // was left in polar-only mode by a compile overwrite (payloads are
+    // equivalent: same string, same engine, same structure)
+    if (this._audio && this.mode !== 'synced') {
+      try { this._audio.currentTime = this.t; } catch { /* noop */ }
+    }
     if (this._audio && this.mode === 'synced') {
       // replay from the start when the audio already ran to its end
       if (this._audio.ended || this._audio.currentTime >= this._duration() - 0.05) {
