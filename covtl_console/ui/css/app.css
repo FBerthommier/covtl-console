@@ -595,3 +595,6 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
   outline-offset: 2px;
 }
 #src-note { font-size: 12px; }
+
+.compiler-rej-line { margin-top: 4px; }
+.compiler-rej-warn { color: var(--warn-text); font-weight: 600; }

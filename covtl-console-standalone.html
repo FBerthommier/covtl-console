@@ -606,6 +606,9 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
 }
 #src-note { font-size: 12px; }
 
+.compiler-rej-line { margin-top: 4px; }
+.compiler-rej-warn { color: var(--warn-text); font-weight: 600; }
+
 </style>
 </head>
 <body>
@@ -1393,7 +1396,13 @@ function renderResult({ duration, frames, phrases, warnings, live, source, cache
     anchors ? el('span', { class: 'res-item' }, el('strong', { text: String(anchors.length) }), ` anchors · ${blocks} blocks`) : null,
     frames ? el('span', { class: 'res-item' }, el('strong', { text: String(frames) }), ' frames @ 400 Hz') : null,
     phrases ? el('span', { class: 'res-item' }, el('strong', { text: String(phrases) }), ` phrase${phrases > 1 ? 's' : ''}`) : null,
-    source ? el('span', { class: 'res-item res-src', text: source === 'sampa' ? 'from edited SAMPA · use_g2p=False' : 'from text · G2P' }) : null,
+    source ? el('span', {
+      class: 'res-item res-src',
+      'data-tip': source === 'compiler' ? 'Synthesized from the compiler-edited blocks (use_g2p=False)'
+        : source === 'sampa' ? 'Synthesized from the edited/previewed final SAMPA (use_g2p=False)'
+        : 'Synthesized from the input text through G2P (deterministic — same SAMPA as preview)',
+      text: source === 'compiler' ? 'from compiler blocks' : source === 'sampa' ? 'from edited SAMPA · use_g2p=False' : 'from text · G2P',
+    }) : null,
     cached ? el('span', { class: 'res-item res-cache', 'data-tip': 'Identical parameters — replayed from cache without engine work', text: 'cache hit' }) : null,
     warnings && warnings.length ? el('span', { class: 'res-item res-warn', text: `${warnings.length} warning${warnings.length > 1 ? 's' : ''}` }) : null,
     el('span', { class: 'res-item badge-live', text: 'live engine' }),
@@ -3041,6 +3050,19 @@ class SyllableCompiler {
         el('span', { text: `${m.anchors} anchors · ${m.blocks} blocks · ${m.duration_s.toFixed(2)} s of planned gestures. ` }),
         el('span', { class: 'dim', text: 'Inspection only — nothing was synthesized. ' }),
         el('span', { text: 'Click a card below to inspect a segment, or press Synthesize to hear this string.' }));
+      // filter feedback: symbols outside the inventory are dropped before
+      // synthesis (guard warn) — show them HERE, red, so the compiler input
+      // is self-checking
+      if (r.rejected.length) {
+        const rejMap = new Map(r.rejected.map((x) => [x.symbol, x]));
+        const uniq = [...rejMap.values()];
+        note.append(el('div', { class: 'compiler-rej-line' },
+          el('span', { class: 'compiler-rej-warn', text: `⚠ ${r.rejected.length} symbol${r.rejected.length > 1 ? 's' : ''} outside the inventory will be DROPPED: ` }),
+          uniq.map((x) => el('span', {
+            class: 'tok tok-rejected mono', text: x.symbol,
+            'data-tip': (x.suggestions || []).length ? `→ ${x.suggestions.join(' / ')}` : (x.reason || 'not in the engine inventory'),
+          }))));
+      }
       for (const w of r.warnings || []) {
         note.append(el('br'), el('span', { class: 'warn-line', text: `⚠ ${w}` }));
       }
@@ -3633,6 +3655,7 @@ function bindControls() {
     if (state.preview) state.sampaTokens = state.preview.tokens;
     if (state.preview) state.sampaRejected = state.preview.rejected;
     renderPreviewStack();
+    compiler?.maybeAutoCompile(finalSampaOf());
     R.toast('SAMPA edit discarded — the previewed string is the synthesis source again', 'info');
   };
   $('#btn-sampa-revert').addEventListener('click', revertSampa);
@@ -4073,12 +4096,18 @@ async function applySampaEdit() {
   closeSampaEditor();
   await guardRefreshEdited();
   renderPreviewStack();
+  // step 2 follows the EDITED string too: the compiler panel always shows
+  // the structure of the current synthesis source
+  compiler?.maybeAutoCompile(finalSampaOf());
 }
 
 function stripRejected() {
   const keep = state.sampaTokens.filter((t) => t.kind !== 'rejected').map((t) => t.sym).join('');
   state.editedSampa = keep;
-  guardRefreshEdited().then(() => renderPreviewStack());
+  guardRefreshEdited().then(() => {
+    renderPreviewStack();
+    compiler?.maybeAutoCompile(finalSampaOf());
+  });
   R.log(`stripped ${state.sampaRejected.length} rejected symbol(s) — final SAMPA marked edited`);
 }
 
@@ -4190,6 +4219,7 @@ function synthPayload(source) {
     exports: state.exports,
     sandhi: state.sandhi, sandhiMode: state.sandhiMode,
     _via: via,
+    _src: info.which,
   };
 }
 
@@ -4199,7 +4229,9 @@ async function synthesize(source) {
   if (!payload.text.trim()) { R.toast('Nothing to synthesize — preview first (P or word end).', 'warn'); return; }
   if (payload.text.length > MAX_CHARS) { R.toast(`Source too long (${payload.text.length} > ${MAX_CHARS} chars).`, 'warn'); return; }
   R.log(`synthesize uses: ${payload._via}`);
+  const srcLabel = payload._src;
   delete payload._via;
+  delete payload._src;
   state.job = { id: null, running: true, cancel: { cancelled: false } };
   $('#job-strip').style.display = '';
   $('#btn-cancel').style.display = '';
@@ -4293,7 +4325,7 @@ function onSynthesisDone(result, payload, source) {
   $('#polar-status').textContent = 'synced to audio clock';
   R.renderResult({
     duration: result.duration, frames: result.frames, phrases: result.phrases,
-    warnings: result.warnings, live: result.live, source: source === 'edited' ? 'sampa' : 'text',
+    warnings: result.warnings, live: result.live, source: srcLabel || 'text',
     cached: result.cached, anchors: result.polar ? result.polar.anchors : null,
     blocks: result.blockCount,
   });

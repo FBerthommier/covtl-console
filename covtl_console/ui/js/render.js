@@ -155,7 +155,13 @@ export function renderResult({ duration, frames, phrases, warnings, live, source
     anchors ? el('span', { class: 'res-item' }, el('strong', { text: String(anchors.length) }), ` anchors · ${blocks} blocks`) : null,
     frames ? el('span', { class: 'res-item' }, el('strong', { text: String(frames) }), ' frames @ 400 Hz') : null,
     phrases ? el('span', { class: 'res-item' }, el('strong', { text: String(phrases) }), ` phrase${phrases > 1 ? 's' : ''}`) : null,
-    source ? el('span', { class: 'res-item res-src', text: source === 'sampa' ? 'from edited SAMPA · use_g2p=False' : 'from text · G2P' }) : null,
+    source ? el('span', {
+      class: 'res-item res-src',
+      'data-tip': source === 'compiler' ? 'Synthesized from the compiler-edited blocks (use_g2p=False)'
+        : source === 'sampa' ? 'Synthesized from the edited/previewed final SAMPA (use_g2p=False)'
+        : 'Synthesized from the input text through G2P (deterministic — same SAMPA as preview)',
+      text: source === 'compiler' ? 'from compiler blocks' : source === 'sampa' ? 'from edited SAMPA · use_g2p=False' : 'from text · G2P',
+    }) : null,
     cached ? el('span', { class: 'res-item res-cache', 'data-tip': 'Identical parameters — replayed from cache without engine work', text: 'cache hit' }) : null,
     warnings && warnings.length ? el('span', { class: 'res-item res-warn', text: `${warnings.length} warning${warnings.length > 1 ? 's' : ''}` }) : null,
     el('span', { class: 'res-item badge-live', text: 'live engine' }),

@@ -396,6 +396,7 @@ function bindControls() {
     if (state.preview) state.sampaTokens = state.preview.tokens;
     if (state.preview) state.sampaRejected = state.preview.rejected;
     renderPreviewStack();
+    compiler?.maybeAutoCompile(finalSampaOf());
     R.toast('SAMPA edit discarded — the previewed string is the synthesis source again', 'info');
   };
   $('#btn-sampa-revert').addEventListener('click', revertSampa);
@@ -836,12 +837,18 @@ async function applySampaEdit() {
   closeSampaEditor();
   await guardRefreshEdited();
   renderPreviewStack();
+  // step 2 follows the EDITED string too: the compiler panel always shows
+  // the structure of the current synthesis source
+  compiler?.maybeAutoCompile(finalSampaOf());
 }
 
 function stripRejected() {
   const keep = state.sampaTokens.filter((t) => t.kind !== 'rejected').map((t) => t.sym).join('');
   state.editedSampa = keep;
-  guardRefreshEdited().then(() => renderPreviewStack());
+  guardRefreshEdited().then(() => {
+    renderPreviewStack();
+    compiler?.maybeAutoCompile(finalSampaOf());
+  });
   R.log(`stripped ${state.sampaRejected.length} rejected symbol(s) — final SAMPA marked edited`);
 }
 
@@ -953,6 +960,7 @@ function synthPayload(source) {
     exports: state.exports,
     sandhi: state.sandhi, sandhiMode: state.sandhiMode,
     _via: via,
+    _src: info.which,
   };
 }
 
@@ -962,7 +970,9 @@ async function synthesize(source) {
   if (!payload.text.trim()) { R.toast('Nothing to synthesize — preview first (P or word end).', 'warn'); return; }
   if (payload.text.length > MAX_CHARS) { R.toast(`Source too long (${payload.text.length} > ${MAX_CHARS} chars).`, 'warn'); return; }
   R.log(`synthesize uses: ${payload._via}`);
+  const srcLabel = payload._src;
   delete payload._via;
+  delete payload._src;
   state.job = { id: null, running: true, cancel: { cancelled: false } };
   $('#job-strip').style.display = '';
   $('#btn-cancel').style.display = '';
@@ -1056,7 +1066,7 @@ function onSynthesisDone(result, payload, source) {
   $('#polar-status').textContent = 'synced to audio clock';
   R.renderResult({
     duration: result.duration, frames: result.frames, phrases: result.phrases,
-    warnings: result.warnings, live: result.live, source: source === 'edited' ? 'sampa' : 'text',
+    warnings: result.warnings, live: result.live, source: srcLabel || 'text',
     cached: result.cached, anchors: result.polar ? result.polar.anchors : null,
     blocks: result.blockCount,
   });

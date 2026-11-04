@@ -280,6 +280,19 @@ export class SyllableCompiler {
         el('span', { text: `${m.anchors} anchors · ${m.blocks} blocks · ${m.duration_s.toFixed(2)} s of planned gestures. ` }),
         el('span', { class: 'dim', text: 'Inspection only — nothing was synthesized. ' }),
         el('span', { text: 'Click a card below to inspect a segment, or press Synthesize to hear this string.' }));
+      // filter feedback: symbols outside the inventory are dropped before
+      // synthesis (guard warn) — show them HERE, red, so the compiler input
+      // is self-checking
+      if (r.rejected.length) {
+        const rejMap = new Map(r.rejected.map((x) => [x.symbol, x]));
+        const uniq = [...rejMap.values()];
+        note.append(el('div', { class: 'compiler-rej-line' },
+          el('span', { class: 'compiler-rej-warn', text: `⚠ ${r.rejected.length} symbol${r.rejected.length > 1 ? 's' : ''} outside the inventory will be DROPPED: ` }),
+          uniq.map((x) => el('span', {
+            class: 'tok tok-rejected mono', text: x.symbol,
+            'data-tip': (x.suggestions || []).length ? `→ ${x.suggestions.join(' / ')}` : (x.reason || 'not in the engine inventory'),
+          }))));
+      }
       for (const w of r.warnings || []) {
         note.append(el('br'), el('span', { class: 'warn-line', text: `⚠ ${w}` }));
       }
