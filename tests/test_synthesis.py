@@ -138,6 +138,25 @@ def test_exports_true_offers_tract_and_polar(client, S):
     assert {"wav", "txt", "tract", "polar"} <= set(kinds)
 
 
+def test_dotted_input_offers_polar_download(client, S):
+    """F1: an input containing '.' must keep its polar download. The
+    early-stage .polar is written under the ENGINE's stem (label_of —
+    dots kept, ta~.a~ta -> ta_.a_ta), the same stem the offered-files
+    glob matches on result.tract_path.stem after the run; the bridge's
+    former own sanitizer mapped '.' to '_' (ta__a_ta.polar) and the
+    file never entered the glob."""
+    out = _run(client, text="ta~.a~ta", exports=True)
+    job = _wait_done(S, out["job_id"])
+    assert job["state"] == "done", job.get("error")
+    files = job["result"]["files"]
+    polar = next((f for f in files if f["kind"] == "polar"), None)
+    assert polar, f"polar download missing: {[f['name'] for f in files]}"
+    assert polar["name"] == "ta_.a_ta.polar"
+    assert Path(job["paths"]["polar"]).exists()
+    assert client.get(
+        f"/api/job/{out['job_id']}/files/{polar['name']}").status_code == 200
+
+
 @pytest.mark.slow
 def test_sagittal_mp4(client, S):
     out = _run(client, text="ba da", outputMode="sagittal", exports=True)

@@ -1421,8 +1421,18 @@ def _worker(job_id: str, req: SynthRequest) -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         use_g2p = req.mode == "ortho"
         video = req.outputMode != "audio"
-        stem = req.label or re.sub(r"[^A-Za-z0-9_\-]", "_",
-                                   (req.text or "output")[:28]).strip("_") or "output"
+        # The early-stage artifacts must land on the ENGINE's stem: after
+        # the run, the offered-files glob matches result.tract_path.stem
+        # (Pipeline.run derives it as (label or label_of(text)).rstrip('._')).
+        # A divergent local sanitizer once wrote ta__a_ta.polar for the
+        # input ta~.a~ta while the glob looked for ta_.a_ta.* — the polar
+        # download silently vanished for any dotted input (finding F1).
+        # Delegating to the engine's own label_of keeps the two identical
+        # by construction (the import cannot fail: Pipeline above already
+        # loaded this very module).
+        from vtl_synth.core.pipeline import label_of as _engine_label_of
+        stem = (req.label or _engine_label_of(req.text or "output")).rstrip("._") \
+            or "output"
 
         # ── stage 1 — trajectory structure (cheap, pure Python) ──
         # Anchors + block schedule + .polar trajectories are built BEFORE
