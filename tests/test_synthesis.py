@@ -157,6 +157,39 @@ def test_dotted_input_offers_polar_download(client, S):
         f"/api/job/{out['job_id']}/files/{polar['name']}").status_code == 200
 
 
+def test_tract_400hz_walk_100hz_contract(client, S):
+    """Tract/walk rate contract (flash-validation report, correction
+    round 2026-11-04): the .tract files the engine writes are 400 Hz
+    artifacts BY CONSTRUCTION (TRACT_SR — intentional,
+    maintainer-confirmed; the production rate must not change), while
+    the walk — structure blocks, .polar payload and the polar display —
+    runs its 100 Hz grid (1 step = 10 ms). Consumers bridge the two
+    explicitly (tests/_flash_vo_probe.py maps step windows onto rows by
+    n_rows/n_steps == 4). This locks both sides and the exact 4:1
+    relation so a change on either side fails loudly here instead of
+    silently mis-aligning every window mapped onto tract rows."""
+    out = _run(client, text="ba da", exports=True)
+    job = _wait_done(S, out["job_id"])
+    assert job["state"] == "done", job.get("error")
+
+    tract_key = next(k for k in job["paths"] if k.endswith(".tract"))
+    header: dict = {}
+    for line in Path(job["paths"][tract_key]).read_text(
+            encoding="utf-8").splitlines():
+        if not line.startswith("#"):
+            break
+        if ":" in line:
+            key, val = line.lstrip("# ").split(":", 1)
+            header[key.strip()] = val.strip()
+    assert int(header["sample_rate"]) == 400      # tract: 400 Hz by construction
+    steps = job["structure"]["metrics"]["steps"]  # walk: 100 Hz grid
+    assert abs(steps / 100.0 - job["result"]["duration"]) < 0.01
+    assert int(header["n_frames"]) == 4 * steps   # decimation 400->100 = 4:1
+    payload = client.get(f"/api/job/{out['job_id']}/polar").json()
+    assert payload["sample_rate"] == 100
+    assert round(payload["duration_s"] * 100) == steps
+
+
 @pytest.mark.slow
 def test_sagittal_mp4(client, S):
     out = _run(client, text="ba da", outputMode="sagittal", exports=True)

@@ -47,7 +47,9 @@ def main() -> int:
     ivs = nasal_hiatus_intervals(blocks, plan, t_voy=8)
 
     # the walk runs at 100 Hz; the .tract file is written at the VTL
-    # target rate (400 Hz) — map step windows onto rows
+    # target rate (400 Hz, BY CONSTRUCTION — maintainer-confirmed rate
+    # contract, locked by test_synthesis.py::test_tract_400hz_walk_100hz_
+    # contract) — map step windows onto rows (scale == 4)
     n_steps = sum(int(b.n_steps) for b in blocks)
     scale = len(vo) / n_steps if n_steps else 1.0
 

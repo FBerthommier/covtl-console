@@ -1498,6 +1498,13 @@ def _worker(job_id: str, req: SynthRequest) -> None:
             return
 
         stem = result.tract_path.stem
+        # Rate contract (maintainer-confirmed 2026-11-04, locked by
+        # tests/test_synthesis.py::test_tract_400hz_walk_100hz_contract):
+        # the .tract files are 400 Hz BY CONSTRUCTION (the engine's
+        # TRACT_SR) and must stay so; the walk — structure blocks,
+        # .polar payload, display — runs its own 100 Hz grid and every
+        # consumer maps explicitly (4 tract rows per step, e.g.
+        # tests/_flash_vo_probe.py).
         files = []
         paths: Dict[str, str] = dict(job.get("paths") or {})
         for p in sorted(out_dir.glob(f"{stem}.*")):
