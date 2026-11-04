@@ -17,7 +17,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 BUNDLE = ROOT / "covtl-console-standalone.html"
-MODULES = ["data", "demo-engine", "render", "api", "polar", "spectrogram",
+MODULES = ["data", "render", "api", "polar", "spectrogram",
            "compiler", "app"]
 LANG_LABELS = ["EN ·", "FR ·", "ES ·", "DE ·", "IT ·", "PT ·"]
 

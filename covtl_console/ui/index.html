@@ -231,11 +231,13 @@
 
     <!-- ─────────── RIGHT: the stage (brief §4.3) ─────────── -->
     <main id="stage">
-      <div id="demo-banner" style="display:none">
-        <strong>Demo mode</strong> — no Python backend detected. The interface, guard semantics and the
-        continuous display run on the browser demo engine (approximate, clearly labeled); for real
-        covtl-pipeline synthesis run <span class="mono">python server.py</span> and
-        <button class="btn btn-xs" id="btn-retry">retry connection</button>.
+      <div id="offline-banner" style="display:none">
+        <strong>Console offline</strong> — the Python bridge is not running, and there is no
+        offline mode: preview, compile and synthesis all require the bridge.
+        Start it with <span class="mono">python -m covtl_console</span> (or
+        <span class="mono">run_console.bat</span>), then
+        <button class="btn btn-xs" id="btn-retry">retry</button> — the console engages
+        automatically as soon as the bridge answers.
       </div>
 
       <!-- preview stack -->
@@ -261,6 +263,8 @@
           <div class="pv-label">Final SAMPA
             <span class="badge-edited" id="badge-sampa-edited" style="display:none">edited</span>
             <span class="count-badge" id="sampa-count" style="display:none">0 rejected</span>
+            <button class="btn btn-xs" id="btn-sampa-revert-inline" style="display:none"
+              data-tip="Discard the SAMPA edit — the previewed string becomes the synthesis source again">↩ revert</button>
           </div>
           <div class="pv-value" id="row-sampa-value"></div>
         </div>
@@ -288,11 +292,15 @@
       <!-- action bar -->
       <section class="zone" id="zone-actions">
         <div class="flow-guide mono" id="flow-guide">
-          <span class="fg-step"><b>1 · Preview</b> text → SAMPA — <em>see what the engine will receive · no sound</em></span>
+          <span class="fg-step"><b>1 · Preview</b> main input → SAMPA — <em>see what the engine will receive · no sound</em></span>
           <span class="fg-arrow">→</span>
-          <span class="fg-step"><b>2 · Compile</b> SAMPA → anchors &amp; blocks — <em>auto after Preview · type your own blocks to explore · no sound</em></span>
+          <span class="fg-step"><b>2 · Compile</b> SAMPA → anchors, blocks &amp; <strong>polar trajectories</strong> — <em>auto after Preview · loads the polar display · no sound</em></span>
           <span class="fg-arrow">→</span>
-          <span class="fg-step"><b>3 · Synthesize</b> uses the compiled SAMPA → audio + polar trajectory — <em>hear exactly what you inspected</em></span>
+          <span class="fg-step"><b>3 · Synthesize</b> the framed source → audio · <em>hear exactly the framed string</em></span>
+        </div>
+        <div class="under-row" style="margin-bottom:6px">
+          <span class="mono" id="src-note" style="color:var(--accent-cyan)">source: —</span>
+          <span class="dim" data-tip="The blue-framed field IS the synthesis source. Precedence: compiler blocks you typed &gt; edited final SAMPA &gt; the main input's preview. Each source has its own revert.">blue frame = synthesis source</span>
         </div>
         <div class="actionbar">
           <button class="btn" id="btn-preview">Preview the engine's input <kbd class="mini inverse">P</kbd></button>

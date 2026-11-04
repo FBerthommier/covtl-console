@@ -93,7 +93,6 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
 - **Result caching** — preview LRU, compile LRU and a synthesis cache keyed
   on the full parameter set *including the engine version* (guard policy
   deliberately excluded; the `error` policy is re-validated on every hit).
-- **Demo mode** — with no Python at all, the console runs a clearly-labeled
   browser simulation of G2P, guard and audio.
 - **Single-file standalone build** — `build_standalone.py` inlines every
   module into `covtl-console-standalone.html`, which works from `file://`
@@ -113,7 +112,6 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
   bridge reports the six rule languages on `/api/health`.
 - Bridge dependencies: `fastapi` and `uvicorn`
 
-Without the engine the console still runs in **demo mode** (see below) —
 simulated G2P/guard/audio and an approximate compiler — clearly labeled as
 such in the UI.
 
@@ -149,7 +147,7 @@ python install_flash.py --run      # ... and start it right away
 `--venv` (target directory), `--engine` (git URL or a local checkout
 path for engine development), `--no-sandhi` (skip the liaison rules —
 the UI default `standard` level then degrades to `off` with a warning),
-`--run`. If the machine has no Python at all, see the no-Python demo
+`--run`.
 mode below; to install Python itself on a locked-down Windows box, the
 NuGet portable package needs no admin rights (see the Windows section).
 
@@ -248,19 +246,12 @@ python3 -m pip install fastapi uvicorn
 python server.py        # → http://127.0.0.1:8421
 ```
 
-### No-Python demo mode
+### The bridge is required
 
-Any static file server will do (ES modules need http):
-
-```bash
-python -m http.server 8080     # then open http://localhost:8080
-```
-
-or simply double-click **`covtl-console-standalone.html`** — a single file
-that works from `file://`. When a live bridge is reachable on
-127.0.0.1:8421 the standalone uses it; otherwise it runs the browser demo
-engine (simulated G2P/guard/audio, approximate syllable compiler, demo
-polar segments — the UI labels every demo surface as such).
+There is **no offline mode**: preview, compile and synthesis are engine
+calls served by the bridge. Without the bridge the console stays in an
+explicit offline state (amber banner) and engages automatically as soon
+as `python -m covtl_console` answers on 127.0.0.1:8421.
 
 ### Ports and artifacts
 

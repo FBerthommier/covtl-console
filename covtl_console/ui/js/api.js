@@ -6,9 +6,8 @@
  *   vtl_synth.Pipeline — the Python backend stays the source of truth
  *   for G2P, the SAMPA guard, syltraj timing, the anchor/block structure
  *   and VocalTractLab synthesis.
- * DEMO mode: no backend detected → the browser-side demo engine simulates
- *   the same stages (clearly labeled everywhere), including an approximate
- *   syllable compiler and polar segments so the whole v3 UI is exercisable.
+ * There is NO offline/demo mode: without the bridge the console stays in
+ *   an explicit offline state and engages automatically when it answers.
  *
  * v3:
  *   • api.health() — brief §10.4 status probe (ok | degraded | offline).
@@ -22,12 +21,10 @@
  *     payload inside); keys mirror the server (engine version included).
  */
 
-import * as demo from './demo-engine.js';
-import { tokenizeSampa, unknownSymbols, enrichRejected } from './data.js';
-
 /* When the console is opened via file:// (double-click), route API calls
  * to the local bridge's default port. Served normally, same-origin wins. */
-const BASE = location.protocol === 'file:' ? 'http://127.0.0.1:8421' : '';
+ let apiBase = location.protocol === 'file:' ? 'http://127.0.0.1:8421' : '';
+export function getApiBase() { return apiBase; }
 /* generous default: embedded/embedded-browser stacks can add seconds of
  * constant per-request latency on loopback (observed ~6 s in the in-app
  * browser while curl answers in 17 ms) — short timeouts misreport a live
@@ -65,8 +62,8 @@ export function cacheInfo() {
            synthEntries: synthCache.size, synthHits: cacheStats.synthHits };
 }
 
-/* demo-mode results must never shadow live ones after an upgrade */
-export function clearDemoCaches() {
+/* clear every result cache (bridge restart / offline→live upgrade) */
+export function clearCaches() {
   previewCache.clear();
   compileCache.clear();
   synthCache.clear();       // a demo-rendered WAV must not replay in live mode
@@ -102,7 +99,7 @@ async function jfetch(path, opts = {}, timeout = TIMEOUT) {
   const timer = setTimeout(() => ctl.abort(), timeout);
   busyDelta(1);
   try {
-    const r = await fetch(BASE + path, { ...opts, signal: ctl.signal,
+     const r = await fetch(apiBase + path, { ...opts, signal: ctl.signal,
       headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
     if (!r.ok) {
       let body = null;
@@ -124,7 +121,7 @@ async function jfetch(path, opts = {}, timeout = TIMEOUT) {
 }
 
 export const api = {
-  mode: 'unknown',          // 'live' | 'demo'
+  mode: 'unknown',          // 'live' | 'offline'
   status: null,
   health: null,
 
@@ -132,18 +129,35 @@ export const api = {
     // several retries — after a bridge restart on the same port, the
     // browser may reuse a dead keep-alive socket for the first fetch(es);
     // a fresh connection succeeds. Gaps grow: 0 / 0.4 s / 2 s.
+    // Candidate bridge origins: same origin first (a bridge serving its
+    // own UI), then the standard bridge port — so a standalone copy served
+    // from a plain static server still finds the bridge on 127.0.0.1:8421.
+    // There is NO demo mode: without the bridge the console stays inert.
+    const BASES = [location.protocol === 'file:' ? 'http://127.0.0.1:8421' : '',
+                   'http://127.0.0.1:8421'];
     const gaps = [0, 400, 2000];
-    for (let attempt = 0; attempt < gaps.length; attempt += 1) {
-      if (gaps[attempt]) await new Promise((r) => setTimeout(r, gaps[attempt]));
-      try {
-        this.status = await jfetch('/api/status', {}, 9000);
-        this.mode = this.status.backend === 'live' ? 'live' : 'demo';
-        break;
-      } catch (err) {
-        console.warn(`[api] probe attempt ${attempt + 1} failed:`, err);
-        this.mode = 'demo';
-        this.status = null;
+    for (const base of BASES) {
+      for (const attempt of [0, 1, 2]) {
+        if (gaps[attempt]) await new Promise((r) => setTimeout(r, gaps[attempt]));
+        try {
+          const r = await fetch(base + '/api/status', {
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(9000),
+          });
+          if (!r.ok) throw new Error(String(r.status));
+          const status = await r.json();
+          if (status.backend !== 'live') throw new Error('backend not live');
+          apiBase = base;
+          this.status = status;
+          this.mode = 'live';
+        } catch (err) {
+          console.warn(`[api] probe attempt ${attempt + 1} on ${base || '(same origin)'} failed:`, err);
+          this.mode = 'offline';
+          this.status = null;
+        }
+        if (this.mode === 'live') break;
       }
+      if (this.mode === 'live') break;
     }
     if (this.mode === 'live') {
       try { this.health = await jfetch('/api/health', {}, 9000); } catch { this.health = null; }
@@ -167,7 +181,13 @@ export const api = {
       return { ...hit, cached: true };
     }
     let out;
-    if (this.mode === 'live') {
+    if (this.mode !== 'live') {
+      const e = new Error('Bridge offline — start it with: python -m covtl_console');
+      e.errorClass = 'BackendUnavailable';
+      e.hint = 'The console requires the Python bridge; there is no offline mode.';
+      throw e;
+    }
+    {
       const r = await jfetch('/api/preview', {
         method: 'POST',
         body: JSON.stringify({ text, sampa, mode, lang, expressive,
@@ -187,49 +207,18 @@ export const api = {
         inventoryDigest: r.inventory_digest || null,
         live: true,
       };
-    } else {
-      // demo: assemble the same shape from the browser-side engine
-      let g2pString = null, enriched, groups = [], warnings = [], words = [];
-      if (sampa !== null) {
-        enriched = sampa;
-        if (expressive) {
-          const e = demo.demoEnrich(sampa, { expressive, lang });
-          enriched = e.enriched; groups = e.groups;
-        }
-      } else if (mode === 'phonetic') {
-        enriched = (text || '').trim();
-      } else {
-        const g = demo.demoG2P(text, lang);
-        g2pString = g.sampa; warnings = g.warnings; words = g.words;
-        const e = demo.demoEnrich(g2pString, { expressive, lang });
-        enriched = e.enriched; groups = e.groups;
-      }
-      const tokens = tokenizeSampa(enriched);
-      out = {
-        g2pString, enriched, final: enriched,
-        words, groups, warnings, tokens,
-        rejected: enrichRejected(unknownSymbols(enriched)),
-        language: lang, lexicon: null, inventoryDigest: null, live: false,
-      };
-      if (sandhi !== 'off') {
-        out.warnings = [...out.warnings,
-          'demo mode: the cross-word sandhi level is not applied (no engine)'];
-      }
     }
     cacheSet(previewCache, key, out, PREVIEW_CACHE_MAX);
     return { ...out, cached: false };
   },
 
   /* ── re-check a hand-edited final SAMPA string ──
-     Live mode asks the engine (source of truth); demo re-tokenizes. */
+     Asks the engine (source of truth). */
   async checkSampa({ sampa }) {
-    if (this.mode === 'live') {
-      const r = await jfetch('/api/preview/sampa', {
-        method: 'POST', body: JSON.stringify({ sampa }),
-      }, 30000);
-      return { tokens: r.tokens, rejected: r.rejected, live: true };
-    }
-    return { tokens: tokenizeSampa(sampa), rejected: enrichRejected(unknownSymbols(sampa)), live: false };
+    const r = await jfetch('/api/preview/sampa', {
+      method: 'POST', body: JSON.stringify({ sampa }),
+    }, 30000);
+    return { tokens: r.tokens, rejected: r.rejected, live: true };
   },
 
   /* ── syllable block compiler — the structural half, never synthesizes ── */
@@ -242,7 +231,13 @@ export const api = {
       return { ...hit, cached: true };
     }
     let out;
-    if (this.mode === 'live') {
+    if (this.mode !== 'live') {
+      const e = new Error('Bridge offline — start it with: python -m covtl_console');
+      e.errorClass = 'BackendUnavailable';
+      e.hint = 'The console requires the Python bridge; there is no offline mode.';
+      throw e;
+    }
+    {
       const r = await jfetch('/api/compile', {
         method: 'POST',
         body: JSON.stringify({ text, lang, timings, guard_policy: guardPolicy }),
@@ -251,14 +246,13 @@ export const api = {
         source: r.source, sampa: r.sampa,
         anchors: r.anchors, blocks: r.blocks, nodes: r.nodes,
         metrics: r.metrics, segmentsPreview: r.segments_preview,
+        polar: r.polar ? normalizePolar(r.polar) : null,
         targets: r.targets || {},
         rejected: r.rejected_symbols || [],
         warnings: r.warnings || [],
         rhoMax: 1.45,
         live: true,
       };
-    } else {
-      out = demo.demoCompile({ text, lang, timings });
     }
     cacheSet(compileCache, key, out, COMPILE_CACHE_MAX);
     return { ...out, cached: false };
@@ -276,8 +270,13 @@ export const api = {
       return { ...hit, cached: true };
     }
     let result;
-    if (this.mode === 'live') result = await this._synthesizeLive(payload, { onStage, onLog, onJob, onPolarReady, cancel });
-    else result = await demo.demoSynthesize(payload, { onStage, onLog, onPolarReady, cancel });
+    if (this.mode !== 'live') {
+      const e = new Error('Bridge offline — start it with: python -m covtl_console');
+      e.errorClass = 'BackendUnavailable';
+      e.hint = 'The console requires the Python bridge; there is no offline mode.';
+      throw e;
+    }
+    result = await this._synthesizeLive(payload, { onStage, onLog, onJob, onPolarReady, cancel });
     cacheSet(synthCache, key, result, SYNTH_CACHE_MAX);
     return { ...result, cached: false };
   },
@@ -328,7 +327,9 @@ export const api = {
         // from the real signal
         busyDelta(1);
         try {
-          const wavResp = await fetch(r.wav_url);
+          // the WAV lives on the bridge origin — a standalone page served
+        // from a different port must not fetch it from its own origin
+        const wavResp = await fetch(apiBase + r.wav_url);
           var wavBuf = await wavResp.arrayBuffer();
         } finally { busyDelta(-1); }
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -345,7 +346,9 @@ export const api = {
           frames: r.frames, phrases: r.phrases, buffer,
           wavUrl: r.wav_url,
           anchors: job.anchors || null, blockCount: job.block_count ?? null,
-          polar, files: r.files, live: true, label: r.label, cached: !!start.cached,
+          polar,
+          files: (r.files || []).map((f) => ({ ...f, url: f.url ? apiBase + f.url : f.url })),
+          live: true, label: r.label, cached: !!start.cached,
           jobId, echo,
         };
       }

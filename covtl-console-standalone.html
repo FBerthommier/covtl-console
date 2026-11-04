@@ -131,12 +131,12 @@ kbd.mini.inverse { color: #0e1319; background: var(--accent-cyan); border-color:
 }
 #stage { flex: 1; overflow-y: auto; padding: 16px 20px 28px; min-width: 0; }
 
-#demo-banner {
+#offline-banner {
   padding: 8px 12px; margin-bottom: 12px; border-radius: var(--radius-c);
   background: var(--warn-surface); color: var(--warn-text); font-size: 12.5px;
   border: 1px solid rgba(232,185,106,.35);
 }
-#demo-banner .mono { color: var(--ink-high); }
+#offline-banner .mono { color: var(--ink-high); }
 
 /* ── control groups (left column) ────────────────────────────────── */
 .group {
@@ -599,6 +599,13 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
   #controls { width: 100%; max-height: 34vh; border-right: none; border-bottom: 1px solid var(--line); }
 }
 
+/* ── synthesis-source highlight (blue frame = what Synthesize speaks) ── */
+.src-frame {
+  outline: 2px solid var(--accent-cyan) !important;
+  outline-offset: 2px;
+}
+#src-note { font-size: 12px; }
+
 </style>
 </head>
 <body>
@@ -823,11 +830,13 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
 
     <!-- ─────────── RIGHT: the stage (brief §4.3) ─────────── -->
     <main id="stage">
-      <div id="demo-banner" style="display:none">
-        <strong>Demo mode</strong> — no Python backend detected. The interface, guard semantics and the
-        continuous display run on the browser demo engine (approximate, clearly labeled); for real
-        covtl-pipeline synthesis run <span class="mono">python server.py</span> and
-        <button class="btn btn-xs" id="btn-retry">retry connection</button>.
+      <div id="offline-banner" style="display:none">
+        <strong>Console offline</strong> — the Python bridge is not running, and there is no
+        offline mode: preview, compile and synthesis all require the bridge.
+        Start it with <span class="mono">python -m covtl_console</span> (or
+        <span class="mono">run_console.bat</span>), then
+        <button class="btn btn-xs" id="btn-retry">retry</button> — the console engages
+        automatically as soon as the bridge answers.
       </div>
 
       <!-- preview stack -->
@@ -853,6 +862,8 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
           <div class="pv-label">Final SAMPA
             <span class="badge-edited" id="badge-sampa-edited" style="display:none">edited</span>
             <span class="count-badge" id="sampa-count" style="display:none">0 rejected</span>
+            <button class="btn btn-xs" id="btn-sampa-revert-inline" style="display:none"
+              data-tip="Discard the SAMPA edit — the previewed string becomes the synthesis source again">↩ revert</button>
           </div>
           <div class="pv-value" id="row-sampa-value"></div>
         </div>
@@ -880,11 +891,15 @@ select:focus, input:focus, textarea:focus, button:focus-visible {
       <!-- action bar -->
       <section class="zone" id="zone-actions">
         <div class="flow-guide mono" id="flow-guide">
-          <span class="fg-step"><b>1 · Preview</b> text → SAMPA — <em>see what the engine will receive · no sound</em></span>
+          <span class="fg-step"><b>1 · Preview</b> main input → SAMPA — <em>see what the engine will receive · no sound</em></span>
           <span class="fg-arrow">→</span>
-          <span class="fg-step"><b>2 · Compile</b> SAMPA → anchors &amp; blocks — <em>auto after Preview · type your own blocks to explore · no sound</em></span>
+          <span class="fg-step"><b>2 · Compile</b> SAMPA → anchors, blocks &amp; <strong>polar trajectories</strong> — <em>auto after Preview · loads the polar display · no sound</em></span>
           <span class="fg-arrow">→</span>
-          <span class="fg-step"><b>3 · Synthesize</b> uses the compiled SAMPA → audio + polar trajectory — <em>hear exactly what you inspected</em></span>
+          <span class="fg-step"><b>3 · Synthesize</b> the framed source → audio · <em>hear exactly the framed string</em></span>
+        </div>
+        <div class="under-row" style="margin-bottom:6px">
+          <span class="mono" id="src-note" style="color:var(--accent-cyan)">source: —</span>
+          <span class="dim" data-tip="The blue-framed field IS the synthesis source. Precedence: compiler blocks you typed &gt; edited final SAMPA &gt; the main input's preview. Each source has its own revert.">blue frame = synthesis source</span>
         </div>
         <div class="actionbar">
           <button class="btn" id="btn-preview">Preview the engine's input <kbd class="mini inverse">P</kbd></button>
@@ -1008,7 +1023,7 @@ __mods['data'] = (function () {
  * Source of truth: vtl_synth/core/constants.py, utils/setlang.py,
  * core/speaker_registry.py, core/sampa_guard.py. In LIVE mode these tables
  * are refreshed from GET /api/status; they are duplicated here only so the
- * console can run its offline DEMO mode and lay out controls before the
+ * console can lay out controls before the
  * Python backend answers.
  * COVTL Console — GPL-3.0-or-later (matches the engine license).
  */
@@ -1148,7 +1163,7 @@ function unknownSymbols(text) {
 
 /* ── Rejected-symbol aid — suggestions mirroring the bridge's SUGGESTIONS ──
  * Purely presentational: the authoritative rejection list always comes
- * from the engine (live) or this tokenizer (demo). These hints just help
+ * from the engine (live). These hints just help
  * the user fix a red symbol fast (IPA → engine SAMPA, uppercase ASCII,
  * ASCII approximations). Kept in sync with server.py SUGGESTIONS. */
 const REJECT_REASON = 'not in the engine inventory (ALL_PHONEME_KEYS) — the longest-match tokenizer would silently drop it before synthesis';
@@ -1174,7 +1189,7 @@ function suggestFor(sym) {
   return [...new Set(out)].filter((s) => INVENTORY_KEYS.has(s) || isMarker(s)).slice(0, 3);
 }
 
-/* Enrich raw {symbol, position} pairs (demo path) to the same shape the
+/* Enrich raw {symbol, position} pairs to the same shape the
  * live bridge returns: reason + suggestions on every rejected symbol. */
 function enrichRejected(rejected) {
   return rejected.map((r) => ({ ...r, reason: REJECT_REASON, suggestions: suggestFor(r.symbol) }));
@@ -1184,103 +1199,6 @@ function isSampaToken(word) {
   // Mirrors phonemes.is_sampa_token: every symbol of the word must be
   // in the inventory (markers not allowed inside a bare word).
   return word.length > 0 && [...word].every((c) => INVENTORY_KEYS.has(c));
-}
-
-/* ── Demo lexicons (DEMO mode only — the live mode calls the Python g2p) */
-/* English: ARPAbet→SAMPA results for common words, syllable dots included. */
-const DEMO_LEXICON_EN = {
-  a: '@', the: 'D@', this: 'Dis', is: 'iz', easy: 'i.zi', for: 'fOR', us: '@s',
-  hello: 'h@.lo', world: 'wORld', good: 'gud', morning: 'mOR.nin', yes: 'jEs',
-  no: 'no', one: 'w2n', two: 'tu', three: 'TRi', four: 'fOR', five: 'faiv',
-  six: 'siks', seven: 'sE.v@n', eight: 'eit', nine: 'nain', ten: 'tEn',
-  cat: 'kat', dog: 'dOg', house: 'haus', water: 'wO.tR', book: 'buk',
-  speech: 'spitS', synthesis: 'sin.T@.sis', voice: 'vOis', tract: 'tRakt',
-  vocal: 'vo.k@l', model: 'ma.d@l', articulatory: 'aR.ti.kj@.l@.tOR.i',
-  text: 'tEkst', phoneme: 'fo.nim', phrase: 'fReiz', syllable: 'si.l@.b@l',
-  pause: 'pOz', long: 'lO~', short: 'SORt', sound: 'saund', listen: 'li.s@n',
-  speak: 'spik', slow: 'slo', fast: 'fast', again: '@.gEn', stop: 'stap',
-  play: 'plei', quick: 'kwik', brown: 'bRaun', fox: 'faks', jumps: 'dZ2mps',
-  over: 'o.vR', lazy: 'lei.zi', now: 'nau', say: 'sei',
-  what: 'w2t', how: 'hau', why: 'wai', who: 'hu', we: 'wi', you: 'ju',
-  they: 'Dei', them: 'DEm', our: 'auR', your: 'jOR', new: 'nu',
-  york: 'jORk', time: 'taim', work: 'wORk', test: 'tEst', demo: 'dE.mo',
-  guard: 'gaRd', error: 'ER', warning: 'waR.nin', red: 'REd', blue: 'blu',
-  consonant: 'kan.s@.n@nt', vowel: 'vau.@l', polar: 'po.lR',
-  plane: 'plein', target: 'taR.g@t', projection: 'pR@.dZEk.S@n',
-};
-/* French: rule-engine-style results for common words. */
-const DEMO_LEXICON_FR = {
-  bonjour: 'bO~.ZuR', comment: 'kO.ma~', allez: 'a.le', vous: 'vu',
-  merci: 'mER.si', ça: 'sa', va: 'va', bien: 'bjE~', monsieur: 'm@.sj2',
-  madame: 'ma.dam', oui: 'wi', non: 'nO~', un: '9~', deux: 'd2',
-  trois: 'tRwa', quatre: 'katR', cinq: 'sE~k', six: 'sis', sept: 'sEt',
-  huit: 'ɥit', neuf: 'n9f', dix: 'dis', chat: 'Sa', chien: 'SJE~',
-  eau: 'o', vie: 'vi', monde: 'mO~d', parole: 'pa.ROl', voix: 'vwa',
-  tract: 'tRakt', synthèse: 'sE~.tEz', articulatoire: 'aR.ti.ky.la.twaR',
-  bon: 'bO~', jour: 'ZuR', facile: 'fa.sil', pour: 'puR', nous: 'nu',
-  les: 'le', des: 'de', une: 'yn', femme: 'fam', homme: 'Om',
-  petit: 'p@.ti', grand: 'gRa~', temps: 'ta~', longue: 'lO~g',
-  courte: 'kuRt', pause: 'poz', respiration: 'REs.pi.Ra.sjO~',
-};
-
-/* Function words used by the demo breath-group chunker (utils/chunking.py). */
-const FUNCTION_WORDS = {
-  en: ['the','a','an','of','to','in','is','are','was','and','or','but','for','with','on','at','by','from','that','this','it','as','not','be','have','has','we','you','they','i','he','she','my','your','our','their','us','me','him','her'],
-  fr: ['le','la','les','un','une','des','du','de','et','ou','mais','pour','avec','sur','en','dans','par','que','qui','ce','cet','cette','il','elle','nous','vous','je','tu','on','ne','pas','plus','est','sont','a','au','aux'],
-};
-
-/* ── Polar targets — demonstrative geometry for DEMO mode ──────────────
- * Vowels inside the unit circle (a 180°, i 300°, u 60° — engine anchors),
- * consonant closures beyond it (ρ 1.0–1.45). Live mode replays the real
- * .polar (format v4) trajectories instead. */
-const POLAR_TARGETS = {
-  a:  { rho: 0.75, theta: 180 }, e:  { rho: 0.62, theta: 240 }, i:  { rho: 0.50, theta: 300 },
-  E:  { rho: 0.62, theta: 252 }, '@': { rho: 0.58, theta: 220 }, 2: { rho: 0.50, theta: 336 },
-  9:  { rho: 0.54, theta: 348 }, o:  { rho: 0.68, theta: 120 },  O:  { rho: 0.76, theta: 100 },
-  u:  { rho: 0.50, theta: 60 },  y:  { rho: 0.46, theta: 340 },  6:  { rho: 0.70, theta: 196 },
-  h:  { rho: 1.42, theta: 176 },
-  p:  { rho: 1.36, theta: 330 }, b: { rho: 1.36, theta: 330 },  m: { rho: 1.28, theta: 330 },
-  f:  { rho: 1.22, theta: 345 }, v: { rho: 1.22, theta: 345 },
-  T:  { rho: 1.18, theta: 302 }, D: { rho: 1.18, theta: 302 },
-  t:  { rho: 1.30, theta: 286 }, d: { rho: 1.30, theta: 286 },  n: { rho: 1.22, theta: 286 },
-  s:  { rho: 1.12, theta: 284 }, z: { rho: 1.12, theta: 284 },  l: { rho: 1.04, theta: 278 },
-  S:  { rho: 1.14, theta: 262 }, Z: { rho: 1.14, theta: 262 },
-  tS: { rho: 1.26, theta: 260 }, dZ:{ rho: 1.26, theta: 260 },  J: { rho: 1.20, theta: 242 },
-  j:  { rho: 0.92, theta: 250 }, k: { rho: 1.34, theta: 212 },  g: { rho: 1.34, theta: 212 },
-  R:  { rho: 1.28, theta: 196 }, w: { rho: 0.98, theta: 32 },   ɥ: { rho: 0.92, theta: 350 },
-};
-
-/* ── Acoustic sketch table (DEMO audio only — formant approximation) ── */
-const ACOUSTICS = {
-  a: { f: [800, 1200, 2600], voiced: 1 }, e: { f: [500, 1900, 2550], voiced: 1 },
-  i: { f: [300, 2300, 3000], voiced: 1 }, o: { f: [500, 900, 2500], voiced: 1 },
-  u: { f: [320, 800, 2450], voiced: 1 },  y: { f: [300, 1750, 2250], voiced: 1 },
-  E: { f: [610, 1780, 2600], voiced: 1 }, O: { f: [560, 900, 2500], voiced: 1 },
-  '@': { f: [550, 1400, 2500], voiced: 1 }, 2: { f: [320, 1500, 2200], voiced: 1 },
-  6: { f: [620, 1250, 2500], voiced: 1 }, 9: { f: [420, 1500, 2250], voiced: 1 },
-  p: { stop: 1, place: 'labial', voiced: 0, burst: [900, 1800] },
-  b: { stop: 1, place: 'labial', voiced: 1, burst: [800, 1600] },
-  t: { stop: 1, place: 'alveolar', voiced: 0, burst: [3500, 5200] },
-  d: { stop: 1, place: 'alveolar', voiced: 1, burst: [3200, 4800] },
-  k: { stop: 1, place: 'velar', voiced: 0, burst: [1800, 2400] },
-  g: { stop: 1, place: 'velar', voiced: 1, burst: [1700, 2300] },
-  f: { fric: [1200, 4200], voiced: 0 }, v: { fric: [1100, 4000], voiced: 1 },
-  s: { fric: [5000, 8500], voiced: 0 }, z: { fric: [4800, 8000], voiced: 1 },
-  S: { fric: [2600, 5200], voiced: 0 }, Z: { fric: [2500, 5000], voiced: 1 },
-  T: { fric: [4200, 6800], voiced: 0 }, D: { fric: [4000, 6500], voiced: 1 },
-  tS: { affr: [2400, 4600], voiced: 0 }, dZ: { affr: [2300, 4400], voiced: 1 },
-  m: { nasal: 1, f: [280, 1100, 2200], voiced: 1 }, n: { nasal: 1, f: [280, 1500, 2500], voiced: 1 },
-  J: { nasal: 1, f: [280, 2000, 2700], voiced: 1 }, l: { f: [360, 950, 2600], voiced: 1 },
-  R: { f: [420, 1150, 2400], voiced: 1 }, j: { glide: [300, 2200, 2950], voiced: 1 },
-  w: { glide: [320, 800, 2400], voiced: 1 }, ɥ: { glide: [310, 1700, 2250], voiced: 1 },
-  h: { fric: [800, 3200], voiced: 0 },
-};
-/* Nasalized vowels: copy of the oral target with a nasal resonance added. */
-for (const v of VOWELS) {
-  const nasal = v + '~';
-  if (!ACOUSTICS[nasal] && ACOUSTICS[v]) {
-    ACOUSTICS[nasal] = { ...ACOUSTICS[v], nasal: 1, f: [Math.max(250, ACOUSTICS[v].f[0] - 140), ACOUSTICS[v].f[1], ACOUSTICS[v].f[2]] };
-  }
 }
 
 /* ── Examples shown as chips under the input textarea ─────────────────
@@ -1296,7 +1214,7 @@ const EXAMPLES = [
   { label: 'PT · bom dia, como vai você', text: 'bom dia, como vai você', mode: 'ortho', lang: 'pt' },
   { label: 'Phonetic · ba da ga | iowa a g', text: 'ba da ga | iowa a g', mode: 'phonetic', lang: 'en' },
   { label: 'Phonetic · pta.kli.pra', text: 'pta.kli.pra', mode: 'phonetic', lang: 'en' },
-  { label: 'Guard demo · cleanpan', text: 'cleanpan', mode: 'phonetic', lang: 'en' },
+  { label: 'Guard · cleanpan', text: 'cleanpan', mode: 'phonetic', lang: 'en' },
 ];
 
 const KEYBOARD_SHORTCUTS = [
@@ -1315,596 +1233,7 @@ const KEYBOARD_SHORTCUTS = [
   { keys: ['?'], action: 'Show this shortcut reference' },
 ];
 
-return { ENGINE: ENGINE, SPEAKERS: SPEAKERS, speakerById: speakerById, LANGUAGES: LANGUAGES, VOWELS: VOWELS, CONSONANTS: CONSONANTS, NASALIZED: NASALIZED, DIPHTHONGS: DIPHTHONGS, TOLERATED_MARKERS: TOLERATED_MARKERS, INVENTORY_KEYS: INVENTORY_KEYS, REJECT_REASON: REJECT_REASON, SAMPA_SUGGESTIONS: SAMPA_SUGGESTIONS, DEMO_LEXICON_EN: DEMO_LEXICON_EN, DEMO_LEXICON_FR: DEMO_LEXICON_FR, FUNCTION_WORDS: FUNCTION_WORDS, POLAR_TARGETS: POLAR_TARGETS, ACOUSTICS: ACOUSTICS, EXAMPLES: EXAMPLES, KEYBOARD_SHORTCUTS: KEYBOARD_SHORTCUTS, isVowel: isVowel, isMarker: isMarker, tokenizeSampa: tokenizeSampa, unknownSymbols: unknownSymbols, suggestFor: suggestFor, enrichRejected: enrichRejected, isSampaToken: isSampaToken };
-})();
-__mods['demo-engine'] = (function () {
-// SPDX-FileCopyrightText: 2026 Frédéric Berthommier
-// SPDX-License-Identifier: GPL-3.0-or-later
-/* demo-engine.js — OFFLINE SIMULATION of the covtl-pipeline stages.
- * This module powers DEMO mode only (no Python backend detected).
- * It deliberately mirrors the ENGINE's semantics — marker rules, guard
- * tokenizer, timing model, F0 declination — but it does NOT reimplement
- * VocalTractLab: demo audio is a formant approximation, clearly labeled.
- * In LIVE mode every function here is bypassed in favor of the local
- * Python server (server.py → vtl_synth.Pipeline), which stays the single
- * source of truth for G2P, the guard and synthesis.
- */
-const { LANGUAGES, DEMO_LEXICON_EN, DEMO_LEXICON_FR, FUNCTION_WORDS, ACOUSTICS, POLAR_TARGETS, tokenizeSampa, isSampaToken, VOWELS, ENGINE } = __mods['data'];;
-
-/* ══════════════════════ G2P (grapheme → phoneme) ══════════════════════
- * Mirrors utils/g2p.py + per-language gateways:
- *  - sentence punctuation  . ! ? ; :  → phrase break  ' | '  (long pause)
- *  - comma / en-dash       , – —      → ' '  (short inter-word pause)
- *  - adjacent words inside a part are joined with '.'  (coarticulation)
- *  - unknown word → kept verbatim + warning (engine: "word not in CMUdict
- *    (kept verbatim)"); words already valid SAMPA pass through silently. */
-function demoG2P(text, lang) {
-  const warnings = [];
-  const profile = LANGUAGES[lang] || LANGUAGES.en;
-  const lex = lang === 'fr' ? DEMO_LEXICON_FR : DEMO_LEXICON_EN;
-  if (lang !== 'en' && lang !== 'fr') {
-    warnings.push(`Demo lexicon covers English and French only — start the Python backend for real ${profile.display} G2P (Wikipron lexicon + rules).`);
-  }
-  // notation gateway: per-language character aliases (setlang notation_alias)
-  let norm = text;
-  for (const [ch, sampa] of Object.entries(profile.alias || {})) norm = norm.split(ch).join(sampa);
-
-  const sentences = norm.split(/[.!?;:]+[\s]*/).map((s) => s.trim()).filter(Boolean);
-  const outPhrases = [];
-  const wordInfos = [];
-  let pIdx = 0;
-  for (const sentence of sentences) {
-    const parts = sentence.split(/\s*[,–—]\s*/).map((p) => p.trim()).filter(Boolean);
-    const sampaParts = [];
-    let cIdx = 0;
-    for (const part of parts) {
-      const words = part.match(/[A-Za-zÀ-ɏ'’]+/g) || [];
-      if (!words.length) continue;
-      const tokens = words.map((w) => {
-        const key = w.toLowerCase();
-        if (lex[key]) { wordInfos.push({ word: w, sampa: lex[key], known: true, phraseIdx: pIdx, partIdx: cIdx }); return lex[key]; }
-        if (isSampaToken(key)) { wordInfos.push({ word: w, sampa: key, known: true, passthrough: true, phraseIdx: pIdx, partIdx: cIdx }); return key; }
-        warnings.push(`word not in ${lang === 'en' ? 'CMUdict' : 'the lexicon'} (kept verbatim): '${w}'`);
-        wordInfos.push({ word: w, sampa: key, known: false, phraseIdx: pIdx, partIdx: cIdx });
-        return key;
-      });
-      sampaParts.push(tokens.join('.'));
-      cIdx += 1;
-    }
-    if (sampaParts.length) outPhrases.push(sampaParts.join(' '));
-    pIdx += 1;
-  }
-  return { sampa: outPhrases.join(' | '), warnings, words: wordInfos, language: lang };
-}
-
-/* ══════════════════ Breath-group chunker (expressive) ═════════════════
- * Mirrors utils/chunking.py in spirit: function-word dictionaries,
- * hard 5-word balance, '%' breath markers between groups. */
-function demoChunk(sampa, lang) {
-  const fw = new Set(FUNCTION_WORDS[lang === 'fr' ? 'fr' : 'en']);
-  const outPhrases = [];
-  for (const phrase of sampa.split(' | ')) {
-    const partOuts = [];
-    for (const part of phrase.split(' ')) {
-      const words = part.split('.');
-      const groups = [];
-      let group = [];
-      const flush = () => { if (group.length) { groups.push(group.join('.')); group = []; } };
-      for (const w of words) {
-        group.push(w);
-        const isFunc = fw.has(w.toLowerCase()) || w.length <= 2;
-        if (!isFunc && group.length >= 3) flush();          // content-word balance
-        if (group.length >= 5) flush();                     // hard 5-word max
-      }
-      flush();
-      partOuts.push(groups.join(' % '));
-    }
-    outPhrases.push(partOuts.join(' '));
-  }
-  return outPhrases.join(' | ');
-}
-
-function demoEnrich(sampa, { expressive, lang }) {
-  const enriched = expressive ? demoChunk(sampa, lang) : sampa;
-  // breath groups for visualization: phrases → groups split on '%'
-  const groups = [];
-  for (const phrase of enriched.split(' | ')) {
-    for (const g of phrase.split(/\s*%\s*/)) {
-      if (g.trim()) groups.push({ sampa: g.trim(), words: g.split(/[. ]/).filter(Boolean).length });
-    }
-  }
-  return { enriched, groups };
-}
-
-/* ══════════════════════ Segment timeline (syltraj) ════════════════════
- * Approximate block schedule: consonant gesture = Tcons, vowel gesture =
- * Tvoy, ' ' = Tpause, '|' = Tpause-long, '%' = 130 ms. (The real syltraj
- * builds typed blocks with cluster sub-arcs; the server recomputes exact
- * timing when the .polar intermediate is produced.) */
-function demoTimeline(sampaText, timings) {
-  const tokens = tokenizeSampa(sampaText);
-  const segments = [];
-  let t = 0.05;                                    // 50 ms leading edge
-  const add = (sym, type, ms) => { const d = ms / 1000; segments.push({ sym, type, start: t, end: t + d }); t += d; };
-  for (const tok of tokens) {
-    switch (tok.sym) {
-      case ' ':  add('␣', 'pause-short', timings.tpause); break;
-      case '|':  add('|', 'pause-long', timings.tpauseLong); break;
-      case '%':  add('%', 'pause-breath', ENGINE.breathPauseMs); break;
-      case ',':  add(',', 'pause-short', timings.tpause); break;
-      case '.': case '-': case '~': break;          // zero-duration markers
-      default:
-        if (tok.kind === 'vowel') add(tok.sym, 'vowel', timings.tvoy);
-        else if (tok.kind === 'consonant') add(tok.sym, 'consonant', timings.tcons);
-        else add(tok.sym, 'rejected', 0);           // dropped by the parser
-    }
-  }
-  t += 0.12;                                       // release + trailing decay
-  return { segments, duration: t };
-}
-
-/* ══════════════════════════ F0 contour ════════════════════════════════
- * Mirrors pipeline.apply_f0_declination (onset gain → final gain, 25 ms
- * attack ramp, per-phrase) + expressive plan: per-group re-attacks, pitch
- * accents (+10 % gaussian on group-initial vowels), stronger nuclear fall. */
-function demoF0(timeline, { f0Base, onset, final, expressive, groups }) {
-  const { segments, duration } = timeline;
-  const vowels = segments.filter((s) => s.type === 'vowel');
-  const phrases = [];
-  let cur = [];
-  for (const s of segments) {
-    if (s.type === 'pause-long') { if (cur.length) phrases.push(cur); cur = []; }
-    else cur.push(s);
-  }
-  if (cur.length) phrases.push(cur);
-
-  const groupStarts = [];
-  if (expressive && groups) {
-    // group-initial vowels = accent targets; group-final vowels = falls
-    let tCursor = 0;
-    for (const g of groups) {
-      const gv = vowels.filter((v) => v.sym && g.sampa.includes(v.sym) && v.start >= tCursor);
-      if (gv.length) { groupStarts.push({ first: gv[0], last: gv[gv.length - 1] }); tCursor = gv[0].start + 0.01; }
-    }
-  }
-  const f0At = (t) => {
-    const phrase = phrases.find((p) => t >= p[0].start && t <= p[p.length - 1].end);
-    if (!phrase || !vowels.length) return f0Base;
-    const p0 = phrase[0].start, p1 = phrase[phrase.length - 1].end;
-    const prog = Math.min(1, Math.max(0, (t - p0) / Math.max(1e-6, p1 - p0)));
-    let g = onset + (final - onset) * prog;
-    const attack = Math.min(1, (t - p0) / 0.025);
-    g = 1.0 + (g - 1.0) * attack;
-    if (expressive) {
-      for (const gs of groupStarts) {
-        if (gs.first) {
-          const d = Math.abs(t - (gs.first.start + gs.first.end) / 2) / 0.06;
-          if (d < 3) g += 0.10 * Math.exp(-0.5 * d * d);      // pitch accent
-        }
-      }
-      const lastV = vowels[vowels.length - 1];
-      if (lastV && t > lastV.start - 0.02 && t < lastV.end + 0.05) g -= 0.06; // nuclear fall
-    }
-    return f0Base * g;
-  };
-  return { f0At, duration };
-}
-
-/* ════════════════════ Formant synthesis (demo audio) ══════════════════
- * Source–filter sketch: glottal periodic wave (−12 dB/oct rolloff) through
- * three automated band-passes + nasal resonator; frication noise through a
- * moving band-pass; stop bursts as short noise pulses at place frequencies. */
-const CONTROL_RATE = 4410;
-
-function buildControlEvents(timeline, f0) {
-  const { segments } = timeline;
-  const events = [];   // {t, f1,f2,f3, voiced, noise, noiseHz, nasal}
-  const push = (t, a) => events.push({ t, ...a });
-  for (const s of segments) {
-    const a = ACOUSTICS[s.sym];
-    const mid = (s.start + s.end) / 2;
-    if (s.type === 'vowel' || (a && (a.glide || a.nasal)) && s.type === 'consonant') {
-      const f = a.f || a.glide;
-      push(s.start + 0.004, { f1: f[0], f2: f[1], f3: f[2], voiced: 0.95, noise: 0, noiseHz: 2000, nasal: a.nasal ? 1 : 0 });
-      push(mid, { f1: f[0], f2: f[1], f3: f[2], voiced: 0.95, noise: 0, noiseHz: 2000, nasal: a.nasal ? 1 : 0 });
-    } else if (a && a.stop) {
-      const locus = { labial: [350, 800, 2200], alveolar: [350, 1700, 2600], velar: [350, 1300, 2300] }[a.place];
-      push(s.start + 0.002, { f1: 250, f2: locus[1], f3: locus[2], voiced: a.voiced ? 0.30 : 0, noise: 0, noiseHz: 1500, nasal: 0 });
-      const burstT = s.start + (s.end - s.start) * 0.7;
-      push(burstT, { f1: 250, f2: locus[1], f3: locus[2], voiced: a.voiced ? 0.2 : 0, noise: 0.9, noiseHz: a.burst[0], nasal: 0 });
-      push(burstT + 0.018, { f1: 250, f2: locus[1], f3: locus[2], voiced: 0.1, noise: 0.15, noiseHz: a.burst[1], nasal: 0 });
-    } else if (a && (a.fric || a.affr)) {
-      const band = a.fric || a.affr;
-      push(s.start + 0.003, { f1: 350, f2: 1200, f3: 2400, voiced: a.voiced ? 0.22 : 0, noise: 0.75, noiseHz: (band[0] + band[1]) / 2, nasal: 0 });
-      push(s.end - 0.003, { f1: 350, f2: 1200, f3: 2400, voiced: a.voiced ? 0.22 : 0, noise: 0.75, noiseHz: (band[0] + band[1]) / 2, nasal: 0 });
-    } else if (a && a.f) {   // l, R, m, n, J
-      push(s.start + 0.004, { f1: a.f[0], f2: a.f[1], f3: a.f[2], voiced: 0.7, noise: 0, noiseHz: 2000, nasal: a.nasal ? 1 : 0 });
-      push(s.end - 0.004, { f1: a.f[0], f2: a.f[1], f3: a.f[2], voiced: 0.7, noise: 0, noiseHz: 2000, nasal: a.nasal ? 1 : 0 });
-    }
-  }
-  events.sort((x, y) => x.t - y.t);
-  return events;
-}
-
-const smooth = (x) => x * x * (3 - 2 * x);
-function sampleCurve(events, t, key) {
-  if (!events.length) return 0;
-  if (t <= events[0].t) return events[0][key];
-  if (t >= events[events.length - 1].t) return events[events.length - 1][key];
-  let i = 0;
-  while (i < events.length - 1 && events[i + 1].t < t) i += 1;
-  const a = events[i], b = events[i + 1];
-  const span = Math.max(1e-6, b.t - a.t);
-  const u = smooth(Math.min(1, Math.max(0, (t - a.t) / span)));
-  return a[key] + (b[key] - a[key]) * u;
-}
-
-async function demoAudio(timeline, f0) {
-  const { duration } = timeline;
-  const n = Math.ceil(duration * ENGINE.audioRateHz);
-  const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  const ctx = new OfflineCtx(1, n, ENGINE.audioRateHz);
-  const master = ctx.createGain();
-  master.gain.value = 0.9;
-  master.connect(ctx.destination);
-
-  // ── voiced branch ──
-  const osc = ctx.createOscillator();
-  const harmonics = new Float32Array(24).map((_, k) => 1 / Math.pow(k + 1, 1.4));
-  harmonics[0] = 0; // remove DC
-  const wave = ctx.createPeriodicWave(harmonics, new Float32Array(24));
-  osc.setPeriodicWave(wave);
-  const voicedBus = ctx.createGain();
-  const bps = [8, 10, 12].map((q) => { const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = q; return f; });
-  const gBps = bps.map(() => ctx.createGain());
-  bps.forEach((f, i) => { osc.connect(f); f.connect(gBps[i]); gBps[i].connect(voicedBus); });
-  gBps.forEach((g, i) => { g.gain.value = [1, 0.7, 0.35][i]; });
-  const voicedGain = ctx.createGain();
-  voicedBus.connect(voicedGain); voicedGain.connect(master);
-  // nasal resonator
-  const nasalFilter = ctx.createBiquadFilter();
-  nasalFilter.type = 'bandpass'; nasalFilter.frequency.value = 250; nasalFilter.Q.value = 1.5;
-  const nasalGain = ctx.createGain();
-  osc.connect(nasalFilter); nasalFilter.connect(nasalGain); nasalGain.connect(master);
-
-  // ── noise branch ──
-  const noiseBuf = ctx.createBuffer(1, ENGINE.audioRateHz * 2, ENGINE.audioRateHz);
-  const nd = noiseBuf.getChannelData(0);
-  for (let i = 0; i < nd.length; i += 1) nd[i] = Math.random() * 2 - 1;
-  const noise = ctx.createBufferSource();
-  noise.buffer = noiseBuf; noise.loop = true;
-  const noiseFilter = ctx.createBiquadFilter();
-  noiseFilter.type = 'bandpass'; noiseFilter.Q.value = 1.2;
-  const noiseGain = ctx.createGain(); noiseGain.gain.value = 0;
-  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(master);
-
-  // ── control curves ──
-  const events = buildControlEvents(timeline, f0);
-  const nCtrl = Math.ceil(duration * CONTROL_RATE);
-  const curve = (fn) => { const a = new Float32Array(nCtrl); for (let i = 0; i < nCtrl; i += 1) a[i] = fn(i / CONTROL_RATE); return a; };
-  const t0 = ctx.currentTime;
-  osc.frequency.setValueCurveAtTime(curve((t) => f0.f0At(t)), t0, nCtrl / CONTROL_RATE);
-  bps[0].frequency.setValueCurveAtTime(curve((t) => sampleCurve(events, t, 'f1')), t0, nCtrl / CONTROL_RATE);
-  bps[1].frequency.setValueCurveAtTime(curve((t) => sampleCurve(events, t, 'f2')), t0, nCtrl / CONTROL_RATE);
-  bps[2].frequency.setValueCurveAtTime(curve((t) => sampleCurve(events, t, 'f3')), t0, nCtrl / CONTROL_RATE);
-  voicedGain.gain.setValueCurveAtTime(curve((t) => sampleCurve(events, t, 'voiced')), t0, nCtrl / CONTROL_RATE);
-  nasalGain.gain.setValueCurveAtTime(curve((t) => 0.5 * sampleCurve(events, t, 'nasal')), t0, nCtrl / CONTROL_RATE);
-  noiseFilter.frequency.setValueCurveAtTime(curve((t) => sampleCurve(events, t, 'noiseHz')), t0, nCtrl / CONTROL_RATE);
-  noiseGain.gain.setValueCurveAtTime(curve((t) => sampleCurve(events, t, 'noise')), t0, nCtrl / CONTROL_RATE);
-  osc.start(t0); noise.start(t0);
-  osc.stop(t0 + duration); noise.stop(t0 + duration);
-  return ctx.startRendering();
-}
-
-/* ═══════════════════ Polar trajectories (demo geometry) ═══════════════
- * Vocalic branch: continuous background arc through the vowel anchors;
- * consonantal branch: excursion to the closure target (ρ > 1) during the
- * consonant only — the two branches are dissociated, as in the .polar
- * format v4 / dual-panel video. */
-function demoPolar(timeline) {
-  const { segments, duration } = timeline;
-  const vowels = segments.filter((s) => s.type === 'vowel' && POLAR_TARGETS[s.sym]);
-  const consonants = segments.filter((s) => s.type === 'consonant' && POLAR_TARGETS[s.sym]);
-  const center = (s) => (s.start + s.end) / 2;
-  const polarAt = (t, list) => {
-    if (!list.length) return null;
-    const lastIdx = list.length - 1;
-    if (t <= center(list[0])) return POLAR_TARGETS[list[0].sym];
-    if (t >= center(list[lastIdx])) return POLAR_TARGETS[list[lastIdx].sym];
-    let i = 0;
-    while (i < lastIdx - 1 && center(list[i + 1]) < t) i += 1;
-    const a = list[i], b = list[i + 1];
-    const ta = center(a), tb = center(b);
-    return lerpTarget(POLAR_TARGETS[a.sym], POLAR_TARGETS[b.sym], smooth(Math.min(1, Math.max(0, (t - ta) / Math.max(1e-6, tb - ta)))));
-  };
-  const consonantAt = (t) => {
-    const c = consonants.find((s) => t >= s.start && t <= s.end);
-    if (!c) return null;
-    const target = POLAR_TARGETS[c.sym];
-    const u = (t - c.start) / (c.end - c.start);
-    const env = Math.sin(Math.PI * Math.min(1, Math.max(0, u))) ** 0.7;   // excursion envelope
-    return { rho: 1 + (target.rho - 1) * env, theta: target.theta };
-  };
-  return { duration, at: (t) => ({ vocalic: polarAt(t, vowels), consonantal: consonantAt(t) }) };
-}
-function lerpTarget(a, b, u) {
-  let d = b.theta - a.theta;
-  while (d > 180) d -= 360;
-  while (d < -180) d += 360;
-  return { rho: a.rho + (b.rho - a.rho) * u, theta: a.theta + d * u };
-}
-
-/* ════════════════════════ Syllable block compiler (v3) ══════════════════
- * DEMO approximation of the engine's syltraj anchor walk. The real
- * structure always comes from the Python backend (POST /api/compile);
- * this arithmetic mirror (cluster (m+1)·Tcons, plateau Tvoy, pause arcs,
- * initial/terminal) keeps the compiler panel and the continuous display
- * exercisable offline. Labeled "approximate" everywhere it is shown. */
-function demoCompile({ text, lang = 'en', timings = {} }) {
-  const prof = LANGUAGES[lang] || LANGUAGES.en;
-  const t = { ...prof.timings, ...timings };
-  const Tcons = Math.max(1, Math.round((t.tcons ?? 100) / 10));
-  const Tvoy = Math.max(1, Math.round((t.tvoy ?? 80) / 10));
-  const Tpause = Math.max(1, Math.round((t.tpause ?? 200) / 10));
-  const TpauseLong = Math.max(1, Math.round((t.tpauseLong ?? 320) / 10));
-
-  const src = (text || '').trim();
-  const phrases = src.split('|').map((p) => p.trim()).filter(Boolean);
-  const anchors = [];
-  const blocks = [];
-  const nodes = [];
-  let cursor = 0;   // steps
-
-  const anchor = (kind, label, extra = {}) => {
-    anchors.push({ i: anchors.length, t: Math.round(cursor) / 100, kind, label, ...extra });
-  };
-  const block = (kind, nSteps, extra = {}) => {
-    blocks.push({ kind, n_steps: nSteps, t0: cursor / 100, t1: (cursor + nSteps) / 100, ...extra });
-    cursor += nSteps;
-  };
-
-  phrases.forEach((phrase, pi) => {
-    anchor('synth', '▸');
-    block('initial', Tpause);
-    // walk syllable-like units: consonant run + vowel, '.' splits inside words
-    const toks = tokenizeSampa(phrase);
-    let consRun = [];
-    const flushVowel = (v) => {
-      const m = consRun.length;
-      if (m > 0) block('cluster', (m + 1) * Tcons, { n_cons: m, cons_keys: consRun, vowel_key: '' });
-      anchor('V', consRun.join('') + v);
-      block('plateau', Tvoy, { vowel_key: v, n_cons: 0, cons_keys: [] });
-      nodes.push({ kind: 'V', key: v, rho: (POLAR_TARGETS[v] || { rho: 0.7 }).rho, theta: (POLAR_TARGETS[v] || { theta: 180 }).theta, in_cluster: false });
-      consRun = [];
-    };
-    for (const tok of toks) {
-      if (tok.kind === 'consonant') consRun.push(tok.sym);
-      else if (tok.kind === 'vowel') flushVowel(tok.sym);
-      else if (tok.kind === 'pause-short' || tok.kind === 'pause-breath') {
-        if (consRun.length) { flushVowel('@'); }
-        block('pause', tok.kind === 'pause-breath' ? 13 : Tpause, { breath: tok.kind === 'pause-breath' });
-        anchor('pause', tok.kind === 'pause-breath' ? '%' : '␣', { breath: tok.kind === 'pause-breath' });
-      }
-      // links ('.') coarticulate — no block, the cluster spans them
-    }
-    if (consRun.length) flushVowel('@');       // trailing consonants → schwa
-    block('decay', Tcons);
-    anchor('V', '', { word_end: true });
-    block('terminal', pi < phrases.length - 1 ? TpauseLong : Tpause);
-    anchor('synth', '◂');
-  });
-
-  const syllables = blocks.filter((b) => b.kind === 'plateau').length;
-  const clusters = blocks.filter((b) => b.kind === 'cluster');
-  const metrics = {
-    anchors: anchors.length,
-    segments: Math.max(0, anchors.length - 1),
-    blocks: blocks.length,
-    syllables,
-    clusters: clusters.length,
-    consonants: clusters.reduce((n, b) => n + (b.n_cons || 0), 0),
-    vowels: nodes.filter((n) => n.kind === 'V').length,
-    steps: cursor,
-    duration_s: cursor / 100,
-  };
-  // segments preview (same shape as /api/compile)
-  const segmentsPreview = [];
-  for (let k = 0; k < anchors.length - 1; k += 1) {
-    const a0 = anchors[k], a1 = anchors[k + 1];
-    if (a1.t <= a0.t) continue;
-    const span = blocks.filter((b) => b.t0 < a1.t - 1e-9 && b.t1 > a0.t + 1e-9);
-    const cons = span.flatMap((b) => b.cons_keys || []);
-    const vowel = (span.find((b) => b.kind === 'plateau') || {}).vowel_key || '';
-    segmentsPreview.push({
-      segment_index: segmentsPreview.length, t0: a0.t, t1: a1.t,
-      label: cons.join('') + vowel || a0.label || a1.label || '-',
-      cons, vowel, kinds: span.map((b) => b.kind),
-      n_steps: Math.round((a1.t - a0.t) * 100),
-    });
-  }
-  // polar targets: POLAR_TARGETS are trig degrees → store radians like the engine
-  const targets = {};
-  for (const [k, tgt] of Object.entries(POLAR_TARGETS)) {
-    targets[k] = { rho: tgt.rho, theta: (tgt.theta * Math.PI) / 180 };
-  }
-  return {
-    source: src, sampa: src, anchors, blocks, nodes, metrics,
-    segmentsPreview, targets, rejected: [],
-    warnings: ['demo arithmetic — approximate structure (start the bridge for the real syltraj walk)'],
-    rhoMax: 1.45, live: false,
-  };
-}
-
-/* demo polar segment payload in the normalized PolarStage shape */
-function demoSegmentPayload(compileResult) {
-  const rhoMax = compileResult.rhoMax || 1.45;
-  const anchors = compileResult.anchors;
-  const segs = [];
-  for (let k = 0; k < anchors.length - 1; k += 1) {
-    const a0 = anchors[k], a1 = anchors[k + 1];
-    if (a1.t <= a0.t + 1e-9) continue;
-    const n = Math.max(1, Math.round((a1.t - a0.t) * 100));
-    const t = new Float32Array(n), rv = new Float32Array(n), tv = new Float32Array(n);
-    let hasC = false;
-    const rc = [], tc = [];
-    for (let i = 0; i < n; i += 1) {
-      const ti = a0.t + i / 100;
-      // positional interpolation between the anchor vowels' polar targets
-      const from = POLAR_TARGETS[_vowelOf(a0.label)] || POLAR_TARGETS['@'];
-      const to = POLAR_TARGETS[_vowelOf(a1.label)] || POLAR_TARGETS['@'];
-      const u = Math.min(1, Math.max(0, (ti - a0.t) / (a1.t - a0.t)));
-      const smooth = u * u * (3 - 2 * u);
-      let dth = to.theta - from.theta;
-      while (dth > 180) dth -= 360;
-      while (dth < -180) dth += 360;
-      t[i] = ti;
-      rv[i] = (from.rho + (to.rho - from.rho) * smooth) / rhoMax;
-      tv[i] = ((90 - (from.theta + dth * smooth)) % 360 + 360) % 360;
-      // consonantal excursion inside cluster spans
-      const span = compileResult.blocks.find((b) => ti >= b.t0 && ti < b.t1 && b.kind === 'cluster');
-      if (span && span.cons_keys && span.cons_keys.length) {
-        const ckey = span.cons_keys[Math.min(span.cons_keys.length - 1,
-          Math.floor((ti - span.t0) / Math.max(1e-9, (span.t1 - span.t0) / span.cons_keys.length)))];
-        const ctgt = POLAR_TARGETS[ckey];
-        if (ctgt) {
-          const env = Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, u))), 0.7);
-          hasC = true;
-          rc.push((1 + (ctgt.rho - 1) * env) / rhoMax);
-          tc.push(((90 - ctgt.theta) % 360 + 360) % 360);
-          continue;
-        }
-      }
-      rc.push(NaN); tc.push(NaN);
-    }
-    segs.push({
-      index: segs.length, t0: a0.t, t1: a1.t,
-      anchorFrom: a0.i, anchorTo: a1.i, labelFrom: a0.label, labelTo: a1.label,
-      blocks: compileResult.blocks
-        .filter((b) => b.t0 < a1.t - 1e-9 && b.t1 > a0.t + 1e-9)
-        .map((b) => ({ kind: b.kind, n_steps: b.n_steps, cons_keys: b.cons_keys || [],
-                       vowel_key: b.vowel_key || '', long: !!b.long, breath: !!b.breath,
-                       t0: b.t0, t1: b.t1 })),
-      markers: null, n, t, rv, tv,
-      rc: hasC ? Float32Array.from(rc) : null,
-      tc: hasC ? Float32Array.from(tc) : null,
-    });
-  }
-  return {
-    jobId: 'demo', rhoMax,
-    duration: compileResult.metrics.duration_s,
-    anchors, segments: segs,
-  };
-}
-
-function _vowelOf(label) {
-  const ch = (label || '').slice(-1);
-  return POLAR_TARGETS[ch] ? ch : null;
-}
-
-/* ════════════════════════ Synthesis orchestration ═════════════════════
- * Staged like the real pipeline: g2p → trajectory → vtl → wav (+ video).
- * Each stage reports progress; the VTL stage is the long one.
- * v3: onPolarReady fires right after the trajectory stage with the demo
- * segment payload, so the continuous display starts before the audio. */
-async function demoSynthesize(payload, { onStage, onLog, onPolarReady, cancel } = {}) {
-  const { text, mode, lang, speaker, timings, expressive, f0, outputMode } = payload;
-  const profile = LANGUAGES[lang] || LANGUAGES.en;
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const checkCancel = () => { if (cancel && cancel.cancelled) { const e = new Error('cancelled'); e.cancelled = true; throw e; } };
-  const stage = async (name, ms, fn) => {
-    checkCancel();
-    onStage?.(name, 'active');
-    onLog?.(`[${name}] running…`);
-    if (fn) await fn();
-    await wait(ms);
-    checkCancel();
-    onStage?.(name, 'done');
-  };
-
-  let sampa, warnings = [], groups = null;
-  await stage('g2p', 140, async () => {
-    if (mode === 'ortho') {
-      const g = demoG2P(text, lang);
-      sampa = g.sampa; warnings = g.warnings;
-      const e = demoEnrich(sampa, { expressive, lang });
-      sampa = e.enriched; groups = e.groups;
-    } else {
-      sampa = text.trim();
-      if (expressive) warnings.push('expressive mode ignored: phonetic input (use_g2p=False) has no syntactic structure');
-    }
-    if (!sampa.trim()) throw new Error(`ValueError — no phonetic content in: '${text.slice(0, 40)}'`);
-  });
-
-  const timeline = demoTimeline(sampa, timings);
-  await stage('trajectory', 420);
-
-  // v3 — continuous display data ready before the audio (start-early)
-  let demoStruct = null;
-  try {
-    demoStruct = demoCompile({ text: sampa, lang, timings });
-    onPolarReady?.(demoSegmentPayload(demoStruct));
-    onLog?.(`[trajectory] ${demoStruct.metrics.blocks} blocks · ${demoStruct.metrics.anchors} anchors (demo arithmetic)`);
-  } catch (err) {
-    onLog?.(`[trajectory] demo structure unavailable: ${err.message}`);
-  }
-
-  const f0c = demoF0(timeline, { f0Base: f0, onset: profile.f0.onset, final: profile.f0.final, expressive, groups });
-  let buffer = null;
-  await stage('vtl', 1250, async () => {
-    onLog?.('[vtl] demo formant renderer (VocalTractLab not available offline)');
-    buffer = await demoAudio(timeline, f0c);
-  });
-
-  const wav = encodeWav(buffer);
-  await stage('wav', 260, async () => {
-    onLog?.(`[wav] ${buffer.duration.toFixed(2)} s, 44.1 kHz mono, ${(wav.byteLength / 1024).toFixed(0)} KiB`);
-  });
-
-  if (outputMode !== 'audio') {
-    await stage('video', 500, async () => {
-      onLog?.('[video] MP4 rendering requires the Python backend (demo mode: skipped)');
-    });
-  }
-
-  const frames = Math.round(timeline.duration * ENGINE.tractRateHz);
-  return {
-    sampa, warnings, groups, timeline, buffer, wav,
-    f0Curve: f0c.f0At,
-    duration: buffer.duration,
-    frames,
-    phrases: sampa.split(' | ').length,
-    polar: demoStruct ? demoSegmentPayload(demoStruct) : demoPolar(timeline),
-    anchors: demoStruct ? demoStruct.anchors : null,
-    blockCount: demoStruct ? demoStruct.metrics.segments : null,
-    files: [
-      { name: 'demo.wav', kind: 'wav', blob: new Blob([wav], { type: 'audio/wav' }), available: true },
-      { name: 'demo_sampa.txt', kind: 'txt', blob: new Blob([sampa + '\n'], { type: 'text/plain' }), available: true },
-      { name: 'demo.tract', kind: 'tract', available: false },
-      { name: 'demo.mp4', kind: 'mp4', available: false },
-    ],
-  };
-}
-
-/* ── WAV encoder (16-bit PCM mono — same format class as the engine) ── */
-function encodeWav(buffer) {
-  const ch = buffer.getChannelData(0);
-  const n = ch.length;
-  const out = new ArrayBuffer(44 + n * 2);
-  const v = new DataView(out);
-  const w = (o, s) => { for (let i = 0; i < s.length; i += 1) v.setUint8(o + i, s.charCodeAt(i)); };
-  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE');
-  w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-  v.setUint32(24, buffer.sampleRate, true); v.setUint32(28, buffer.sampleRate * 2, true);
-  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
-  w(36, 'data'); v.setUint32(40, n * 2, true);
-  for (let i = 0; i < n; i += 1) {
-    const s = Math.max(-1, Math.min(1, ch[i]));
-    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-  }
-  return out;
-}
-
-return { demoG2P: demoG2P, demoChunk: demoChunk, demoEnrich: demoEnrich, demoTimeline: demoTimeline, demoF0: demoF0, demoPolar: demoPolar, demoCompile: demoCompile, demoSegmentPayload: demoSegmentPayload, encodeWav: encodeWav, demoAudio: demoAudio, demoSynthesize: demoSynthesize };
+return { ENGINE: ENGINE, SPEAKERS: SPEAKERS, speakerById: speakerById, LANGUAGES: LANGUAGES, VOWELS: VOWELS, CONSONANTS: CONSONANTS, NASALIZED: NASALIZED, DIPHTHONGS: DIPHTHONGS, TOLERATED_MARKERS: TOLERATED_MARKERS, INVENTORY_KEYS: INVENTORY_KEYS, REJECT_REASON: REJECT_REASON, SAMPA_SUGGESTIONS: SAMPA_SUGGESTIONS, EXAMPLES: EXAMPLES, KEYBOARD_SHORTCUTS: KEYBOARD_SHORTCUTS, isVowel: isVowel, isMarker: isMarker, tokenizeSampa: tokenizeSampa, unknownSymbols: unknownSymbols, suggestFor: suggestFor, enrichRejected: enrichRejected, isSampaToken: isSampaToken };
 })();
 __mods['render'] = (function () {
 // SPDX-FileCopyrightText: 2026 Frédéric Berthommier
@@ -2067,7 +1396,7 @@ function renderResult({ duration, frames, phrases, warnings, live, source, cache
     source ? el('span', { class: 'res-item res-src', text: source === 'sampa' ? 'from edited SAMPA · use_g2p=False' : 'from text · G2P' }) : null,
     cached ? el('span', { class: 'res-item res-cache', 'data-tip': 'Identical parameters — replayed from cache without engine work', text: 'cache hit' }) : null,
     warnings && warnings.length ? el('span', { class: 'res-item res-warn', text: `${warnings.length} warning${warnings.length > 1 ? 's' : ''}` }) : null,
-    el('span', { class: `res-item badge-${live ? 'live' : 'demo'}`, text: live ? 'live engine' : 'demo renderer' }),
+    el('span', { class: 'res-item badge-live', text: 'live engine' }),
   ];
   items.filter(Boolean).forEach((i) => box.append(i));
 }
@@ -2129,9 +1458,8 @@ __mods['api'] = (function () {
  *   vtl_synth.Pipeline — the Python backend stays the source of truth
  *   for G2P, the SAMPA guard, syltraj timing, the anchor/block structure
  *   and VocalTractLab synthesis.
- * DEMO mode: no backend detected → the browser-side demo engine simulates
- *   the same stages (clearly labeled everywhere), including an approximate
- *   syllable compiler and polar segments so the whole v3 UI is exercisable.
+ * There is NO offline/demo mode: without the bridge the console stays in
+ *   an explicit offline state and engages automatically when it answers.
  *
  * v3:
  *   • api.health() — brief §10.4 status probe (ok | degraded | offline).
@@ -2145,12 +1473,10 @@ __mods['api'] = (function () {
  *     payload inside); keys mirror the server (engine version included).
  */
 
-const demo = __mods['demo-engine'];;
-const { tokenizeSampa, unknownSymbols, enrichRejected } = __mods['data'];;
-
 /* When the console is opened via file:// (double-click), route API calls
  * to the local bridge's default port. Served normally, same-origin wins. */
-const BASE = location.protocol === 'file:' ? 'http://127.0.0.1:8421' : '';
+ let apiBase = location.protocol === 'file:' ? 'http://127.0.0.1:8421' : '';
+function getApiBase() { return apiBase; }
 /* generous default: embedded/embedded-browser stacks can add seconds of
  * constant per-request latency on loopback (observed ~6 s in the in-app
  * browser while curl answers in 17 ms) — short timeouts misreport a live
@@ -2188,8 +1514,8 @@ function cacheInfo() {
            synthEntries: synthCache.size, synthHits: cacheStats.synthHits };
 }
 
-/* demo-mode results must never shadow live ones after an upgrade */
-function clearDemoCaches() {
+/* clear every result cache (bridge restart / offline→live upgrade) */
+function clearCaches() {
   previewCache.clear();
   compileCache.clear();
   synthCache.clear();       // a demo-rendered WAV must not replay in live mode
@@ -2225,7 +1551,7 @@ async function jfetch(path, opts = {}, timeout = TIMEOUT) {
   const timer = setTimeout(() => ctl.abort(), timeout);
   busyDelta(1);
   try {
-    const r = await fetch(BASE + path, { ...opts, signal: ctl.signal,
+     const r = await fetch(apiBase + path, { ...opts, signal: ctl.signal,
       headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
     if (!r.ok) {
       let body = null;
@@ -2247,7 +1573,7 @@ async function jfetch(path, opts = {}, timeout = TIMEOUT) {
 }
 
 const api = {
-  mode: 'unknown',          // 'live' | 'demo'
+  mode: 'unknown',          // 'live' | 'offline'
   status: null,
   health: null,
 
@@ -2255,18 +1581,35 @@ const api = {
     // several retries — after a bridge restart on the same port, the
     // browser may reuse a dead keep-alive socket for the first fetch(es);
     // a fresh connection succeeds. Gaps grow: 0 / 0.4 s / 2 s.
+    // Candidate bridge origins: same origin first (a bridge serving its
+    // own UI), then the standard bridge port — so a standalone copy served
+    // from a plain static server still finds the bridge on 127.0.0.1:8421.
+    // There is NO demo mode: without the bridge the console stays inert.
+    const BASES = [location.protocol === 'file:' ? 'http://127.0.0.1:8421' : '',
+                   'http://127.0.0.1:8421'];
     const gaps = [0, 400, 2000];
-    for (let attempt = 0; attempt < gaps.length; attempt += 1) {
-      if (gaps[attempt]) await new Promise((r) => setTimeout(r, gaps[attempt]));
-      try {
-        this.status = await jfetch('/api/status', {}, 9000);
-        this.mode = this.status.backend === 'live' ? 'live' : 'demo';
-        break;
-      } catch (err) {
-        console.warn(`[api] probe attempt ${attempt + 1} failed:`, err);
-        this.mode = 'demo';
-        this.status = null;
+    for (const base of BASES) {
+      for (const attempt of [0, 1, 2]) {
+        if (gaps[attempt]) await new Promise((r) => setTimeout(r, gaps[attempt]));
+        try {
+          const r = await fetch(base + '/api/status', {
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(9000),
+          });
+          if (!r.ok) throw new Error(String(r.status));
+          const status = await r.json();
+          if (status.backend !== 'live') throw new Error('backend not live');
+          apiBase = base;
+          this.status = status;
+          this.mode = 'live';
+        } catch (err) {
+          console.warn(`[api] probe attempt ${attempt + 1} on ${base || '(same origin)'} failed:`, err);
+          this.mode = 'offline';
+          this.status = null;
+        }
+        if (this.mode === 'live') break;
       }
+      if (this.mode === 'live') break;
     }
     if (this.mode === 'live') {
       try { this.health = await jfetch('/api/health', {}, 9000); } catch { this.health = null; }
@@ -2290,7 +1633,13 @@ const api = {
       return { ...hit, cached: true };
     }
     let out;
-    if (this.mode === 'live') {
+    if (this.mode !== 'live') {
+      const e = new Error('Bridge offline — start it with: python -m covtl_console');
+      e.errorClass = 'BackendUnavailable';
+      e.hint = 'The console requires the Python bridge; there is no offline mode.';
+      throw e;
+    }
+    {
       const r = await jfetch('/api/preview', {
         method: 'POST',
         body: JSON.stringify({ text, sampa, mode, lang, expressive,
@@ -2310,49 +1659,18 @@ const api = {
         inventoryDigest: r.inventory_digest || null,
         live: true,
       };
-    } else {
-      // demo: assemble the same shape from the browser-side engine
-      let g2pString = null, enriched, groups = [], warnings = [], words = [];
-      if (sampa !== null) {
-        enriched = sampa;
-        if (expressive) {
-          const e = demo.demoEnrich(sampa, { expressive, lang });
-          enriched = e.enriched; groups = e.groups;
-        }
-      } else if (mode === 'phonetic') {
-        enriched = (text || '').trim();
-      } else {
-        const g = demo.demoG2P(text, lang);
-        g2pString = g.sampa; warnings = g.warnings; words = g.words;
-        const e = demo.demoEnrich(g2pString, { expressive, lang });
-        enriched = e.enriched; groups = e.groups;
-      }
-      const tokens = tokenizeSampa(enriched);
-      out = {
-        g2pString, enriched, final: enriched,
-        words, groups, warnings, tokens,
-        rejected: enrichRejected(unknownSymbols(enriched)),
-        language: lang, lexicon: null, inventoryDigest: null, live: false,
-      };
-      if (sandhi !== 'off') {
-        out.warnings = [...out.warnings,
-          'demo mode: the cross-word sandhi level is not applied (no engine)'];
-      }
     }
     cacheSet(previewCache, key, out, PREVIEW_CACHE_MAX);
     return { ...out, cached: false };
   },
 
   /* ── re-check a hand-edited final SAMPA string ──
-     Live mode asks the engine (source of truth); demo re-tokenizes. */
+     Asks the engine (source of truth). */
   async checkSampa({ sampa }) {
-    if (this.mode === 'live') {
-      const r = await jfetch('/api/preview/sampa', {
-        method: 'POST', body: JSON.stringify({ sampa }),
-      }, 30000);
-      return { tokens: r.tokens, rejected: r.rejected, live: true };
-    }
-    return { tokens: tokenizeSampa(sampa), rejected: enrichRejected(unknownSymbols(sampa)), live: false };
+    const r = await jfetch('/api/preview/sampa', {
+      method: 'POST', body: JSON.stringify({ sampa }),
+    }, 30000);
+    return { tokens: r.tokens, rejected: r.rejected, live: true };
   },
 
   /* ── syllable block compiler — the structural half, never synthesizes ── */
@@ -2365,7 +1683,13 @@ const api = {
       return { ...hit, cached: true };
     }
     let out;
-    if (this.mode === 'live') {
+    if (this.mode !== 'live') {
+      const e = new Error('Bridge offline — start it with: python -m covtl_console');
+      e.errorClass = 'BackendUnavailable';
+      e.hint = 'The console requires the Python bridge; there is no offline mode.';
+      throw e;
+    }
+    {
       const r = await jfetch('/api/compile', {
         method: 'POST',
         body: JSON.stringify({ text, lang, timings, guard_policy: guardPolicy }),
@@ -2374,14 +1698,13 @@ const api = {
         source: r.source, sampa: r.sampa,
         anchors: r.anchors, blocks: r.blocks, nodes: r.nodes,
         metrics: r.metrics, segmentsPreview: r.segments_preview,
+        polar: r.polar ? normalizePolar(r.polar) : null,
         targets: r.targets || {},
         rejected: r.rejected_symbols || [],
         warnings: r.warnings || [],
         rhoMax: 1.45,
         live: true,
       };
-    } else {
-      out = demo.demoCompile({ text, lang, timings });
     }
     cacheSet(compileCache, key, out, COMPILE_CACHE_MAX);
     return { ...out, cached: false };
@@ -2399,8 +1722,13 @@ const api = {
       return { ...hit, cached: true };
     }
     let result;
-    if (this.mode === 'live') result = await this._synthesizeLive(payload, { onStage, onLog, onJob, onPolarReady, cancel });
-    else result = await demo.demoSynthesize(payload, { onStage, onLog, onPolarReady, cancel });
+    if (this.mode !== 'live') {
+      const e = new Error('Bridge offline — start it with: python -m covtl_console');
+      e.errorClass = 'BackendUnavailable';
+      e.hint = 'The console requires the Python bridge; there is no offline mode.';
+      throw e;
+    }
+    result = await this._synthesizeLive(payload, { onStage, onLog, onJob, onPolarReady, cancel });
     cacheSet(synthCache, key, result, SYNTH_CACHE_MAX);
     return { ...result, cached: false };
   },
@@ -2451,7 +1779,9 @@ const api = {
         // from the real signal
         busyDelta(1);
         try {
-          const wavResp = await fetch(r.wav_url);
+          // the WAV lives on the bridge origin — a standalone page served
+        // from a different port must not fetch it from its own origin
+        const wavResp = await fetch(apiBase + r.wav_url);
           var wavBuf = await wavResp.arrayBuffer();
         } finally { busyDelta(-1); }
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2468,7 +1798,9 @@ const api = {
           frames: r.frames, phrases: r.phrases, buffer,
           wavUrl: r.wav_url,
           anchors: job.anchors || null, blockCount: job.block_count ?? null,
-          polar, files: r.files, live: true, label: r.label, cached: !!start.cached,
+          polar,
+          files: (r.files || []).map((f) => ({ ...f, url: f.url ? apiBase + f.url : f.url })),
+          live: true, label: r.label, cached: !!start.cached,
           jobId, echo,
         };
       }
@@ -2503,7 +1835,7 @@ function normalizePolar(p) {
   };
 }
 
-return { api: api, synthCacheKey: synthCacheKey, cacheInfo: cacheInfo, clearDemoCaches: clearDemoCaches, normalizePolar: normalizePolar };
+return { api: api, getApiBase: getApiBase, synthCacheKey: synthCacheKey, cacheInfo: cacheInfo, clearCaches: clearCaches, normalizePolar: normalizePolar };
 })();
 __mods['polar'] = (function () {
 // SPDX-FileCopyrightText: 2026 Frédéric Berthommier
@@ -3133,7 +2465,7 @@ __mods['spectrogram'] = (function () {
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* spectrogram.js — spectrogram, phonetic segmentation overlay, time cursor.
  * The spectrogram is computed in the browser (radix-2 FFT, Hann window)
- * from the audio returned by the backend (or by the demo renderer), so the
+ * from the audio returned by the backend, so the
  * picture always shows the actual signal. In LIVE mode the server can also
  * supply a precomputed PNG; this renderer is the offline fallback. */
 
@@ -3522,7 +2854,7 @@ class SyllableCompiler {
     this.rootEl = el('section', { class: 'zone zone-compiler', id: 'zone-compiler' });
     const head = el('header', { class: 'zone-head' },
       el('h2', { text: 'Syllable compiler' }),
-      el('span', { class: 'zone-sub', text: 'the engine’s articulation plan — auto-compiles the preview’s final SAMPA · type your own blocks to explore · no audio' }),
+      el('span', { class: 'zone-sub', text: 'the engine’s full symbolic output — anchors, blocks & polar trajectories (loaded into the display) · no audio' }),
       el('span', { class: 'head-gap' }),
       el('span', { class: 'compiler-src-note mono', id: 'compiler-src-note' }),
       el('button', { class: 'btn btn-primary', id: 'btn-compile',
@@ -3551,6 +2883,7 @@ class SyllableCompiler {
     this.input.addEventListener('input', () => {
       this._seq = (this._seq || 0) + 1;      // stale responses must not land
       this.userEdited = this.input.value !== this._lastAuto;
+      this._updateRelink();
     });
 
     const presets = el('div', { class: 'chips-row compiler-presets' },
@@ -3594,6 +2927,10 @@ class SyllableCompiler {
         el('div', { class: 'block-canvas-title' }, 'block cards', el('span', { class: 'dim', text: ' — click a card to inspect its structure; click again to collapse' })),
         this.canvas,
         el('div', { class: 'compiler-actions' },
+          el('button', { class: 'btn btn-sm', id: 'btn-compiler-relink', style: 'display:none',
+            'data-tip': 'Discard these manual blocks — the preview string becomes the compiled source again',
+            text: '↩ re-link to preview',
+            onclick: () => this.relink() }),
           el('button', { class: 'btn btn-sm', id: 'btn-compiler-send', text: 'Use in phonetic input →',
             'data-tip': 'Send to the phonetic input', onclick: () => this._send() }),
           el('span', { class: 'dim', id: 'compiler-link-note' })),
@@ -3664,6 +3001,7 @@ class SyllableCompiler {
       }
       this.userEdited = false;
       this._lastAuto = sampa;
+      this._updateRelink();
       if (document.activeElement !== this.input) this.input.value = sampa;
       this.compile(sampa).catch(() => {});
     }, 120);
@@ -3691,7 +3029,9 @@ class SyllableCompiler {
       this.result = r;
       this.selected = -1;
       this.userEdited = src !== this._lastAuto;   // explicit Compile of a manual string stays manual
+      this._updateRelink();
       this._render();
+      if (r.polar) this.opts.onPolarCompiled?.(r.polar);
       const m = r.metrics;
       const note = document.getElementById('compiler-result-note');
       note.style.display = '';
@@ -3743,8 +3083,8 @@ class SyllableCompiler {
     this._renderBlockString(r);
     this._renderCanvas(r);
     const note = document.getElementById('compiler-src-note');
-    note.textContent = r.live ? 'engine: syltraj (live)' : 'demo arithmetic (approximate — labeled)';
-    note.className = `compiler-src-note mono ${r.live ? 'ok' : 'warn'}`;
+    note.textContent = 'engine: syltraj (live)';
+    note.className = 'compiler-src-note mono ok';
   }
 
   _renderTiles(r) {
@@ -3861,6 +3201,25 @@ class SyllableCompiler {
     });
   }
 
+  /* discard manual blocks — the preview string becomes the source again */
+  relink() {
+    this.userEdited = false;
+    const f = this.opts.getPreviewFinal?.();
+    if (f) {
+      this._lastAuto = f;
+      this.input.value = f;
+      this.compile(f).catch(() => {});
+    } else {
+      this._updateRelink();
+    }
+  }
+
+  _updateRelink() {
+    const b = document.getElementById('btn-compiler-relink');
+    if (b) b.style.display = this.userEdited ? '' : 'none';
+    this.opts.onSourceChanged?.();
+  }
+
   _send() {
     const src = (this.input.value || '').trim();
     if (src) this.opts.onSendToInput?.(src);
@@ -3892,7 +3251,7 @@ __mods['app'] = (function () {
  * The Python engine (through server.py) stays the single source of truth;
  * this file only owns presentation, transport and shortcuts.
  */
-const { api, cacheInfo, clearDemoCaches } = __mods['api'];;
+const { api, cacheInfo, clearCaches, getApiBase } = __mods['api'];;
 const R = __mods['render'];;
 const { LANGUAGES, SPEAKERS, VOWELS, CONSONANTS, EXAMPLES } = __mods['data'];;
 const { PolarStage } = __mods['polar'];;
@@ -3958,13 +3317,16 @@ async function init() {
     getTimings: () => state.timings,
     getGuardPolicy: () => state.guardPolicy,
     getLang: () => state.lang,
+    getPreviewFinal: () => finalSampaOf(),
     onSendToInput: (sampa) => useInPhoneticInput(sampa),
     onSeekSegment: (idx) => seekSegment(idx),
+    onPolarCompiled: (polar) => loadCompiledPolar(polar),
+    onSourceChanged: () => updateSourceFrame(),
     onLog: (m) => R.log(m),
   });
   const mode = await api.probe();
   setBackendChip();
-  if (mode === 'demo') $('#demo-banner').style.display = '';
+  if (mode === 'offline') $('#offline-banner').style.display = '';
   applyStateToControls();
   updateDerived();
   await convert();
@@ -3973,16 +3335,17 @@ async function init() {
   // the very first tab load after a bridge restart can race the server's
   // first-response warm-up — re-probe in the background and upgrade to
   // live (re-running the flows) without requiring the user to hit Retry
-  if (mode === 'demo' && location.protocol !== 'file:') {
+  if (mode === 'offline' && location.protocol !== 'file:') {
     for (const delay of [2000, 6000, 15000]) {
       setTimeout(async () => {
-        if (api.mode !== 'demo') return;
+        if (api.mode === 'live') return;
         await api.probe();
         if (api.mode === 'live') {
           setBackendChip();
-          previewCacheBust();
+          clearCaches();
           await convert();
-          R.log('backend came online — live engine engaged (auto-retry)');
+          compiler.compile(compiler.input.value || finalSampaOf()).catch(() => {});
+          R.log('bridge came online — console engaged (auto-retry)');
         }
       }, delay);
     }
@@ -3990,9 +3353,22 @@ async function init() {
   setInterval(refreshBackend, 15000);
 }
 
-function previewCacheBust() {
-  // demo-mode previews must not shadow live ones
-  clearDemoCaches();
+/* Compile delivers the engine's FULL symbolic output — anchors, blocks and
+ * the real polar trajectories (syltraj, no audio). The display runs in
+ * polar-only mode; Synthesize attaches the sound. */
+function loadCompiledPolar(polar) {
+  if (state.job.running) {
+    R.log('compile polar skipped — a synthesis job is running (its own trajectory will land)');
+    return;
+  }
+  state.polar = polar;
+  polarStage.detachAudio();
+  polarStage.setPayload(polar);
+  polarStage.seek(0);
+  buildScrubTicks();
+  $('#polar-status').textContent =
+    'compiled structure — polar-only (no audio) · Synthesize attaches the sound';
+  R.log(`compiled polar trajectories loaded: ${polar.segments.length} blocks / ${polar.anchors.length} anchors — display in polar-only mode`);
 }
 
 /* ═══════════════════════ static UI ═══════════════════════ */
@@ -4238,7 +3614,7 @@ function bindControls() {
   $('#btn-retry').addEventListener('click', async () => {
     await api.probe();
     setBackendChip();
-    clearDemoCaches();
+    clearCaches();
     convert();
   });
   $('#btn-inventory').addEventListener('click', () => {
@@ -4251,13 +3627,16 @@ function bindControls() {
   $('#btn-sampa-edit').addEventListener('click', openSampaEditor);
   $('#btn-sampa-apply').addEventListener('click', applySampaEdit);
   $('#btn-sampa-cancel').addEventListener('click', closeSampaEditor);
-  $('#btn-sampa-revert').addEventListener('click', () => {
+  const revertSampa = () => {
     state.editedSampa = null;
     closeSampaEditor();
     if (state.preview) state.sampaTokens = state.preview.tokens;
     if (state.preview) state.sampaRejected = state.preview.rejected;
     renderPreviewStack();
-  });
+    R.toast('SAMPA edit discarded — the previewed string is the synthesis source again', 'info');
+  };
+  $('#btn-sampa-revert').addEventListener('click', revertSampa);
+  $('#btn-sampa-revert-inline').addEventListener('click', revertSampa);
   $('#sampa-edit').addEventListener('input', debouncedGuardCheck);
   $('#sampa-edit').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); applySampaEdit(); }
@@ -4387,6 +3766,15 @@ function updateOutResolved() {
 }
 
 function updateSynthButtons() {
+  updateSourceFrame();
+  if (api.mode !== 'live') {
+    const btn = $('#btn-synth');
+    btn.disabled = true;
+    btn.textContent = 'Synthesize — bridge offline';
+    $('#btn-synth-edit').disabled = true;
+    $('#btn-preview').disabled = api.mode !== 'live';
+    return;
+  }
   const rej = state.sampaRejected.length;
   const hasPhonetic = state.sampaTokens.some((t) => t.kind === 'vowel' || t.kind === 'consonant');
   const btn = $('#btn-synth');
@@ -4405,7 +3793,7 @@ function updateSynthButtons() {
     btnE.disabled = true;
   } else if (!hasPhonetic) {
     btn.disabled = true;
-    btn.textContent = 'Synthesize — no phonetic content';
+    btn.textContent = 'Synthesize — the framed source has no vowels or consonants';
     btnE.disabled = true;
   } else if (state.guardPolicy === 'error' && rej > 0) {
     btn.disabled = true;
@@ -4527,6 +3915,12 @@ async function convert() {
   if (src.length > MAX_CHARS) return;
   // immediate feedback — under slow links the user must see the request
   // is in flight (the "nothing happens, then it lands later" bug)
+  if (api.mode !== 'live') {
+    setAppState('backend-offline');
+    $('#preview-status').textContent =
+      'Bridge offline — start it (python -m covtl_console); the console engages automatically.';
+    return;
+  }
   const btnP = $('#btn-preview');
   btnP.disabled = true;
   const oldLabel = btnP.textContent;
@@ -4571,6 +3965,7 @@ function renderPreviewStack() {
   const samRow = $('#row-sampa-value');
   g2pRow.innerHTML = ''; enrRow.innerHTML = ''; samRow.innerHTML = '';
   $('#badge-sampa-edited').style.display = state.editedSampa !== null ? '' : 'none';
+  $('#btn-sampa-revert-inline').style.display = state.editedSampa !== null ? '' : 'none';
 
   if (!p) {
     g2pRow.append(R.el('span', { class: 'dim', text: '—' }));
@@ -4731,55 +4126,70 @@ function useInPhoneticInput(sampa) {
  *    exact previewed/edited string goes through --phonetic (use_g2p=False).
  * Synthesize is DISABLED until a preview exists — everything is visible
  * before it can run. */
-function synthPayload(source) {
-  // priority 1 — the COMPILER output when the user edited its field: the
-  // brief's contract is that Synthesize speaks the compiled structure
+/* The ONE precedence rule for what Synthesize speaks:
+ *   1. compiler blocks you typed (syllabic edition)
+ *   2. the edited final SAMPA
+ *   3. the main input's preview (deterministic G2P when the text is intact)
+ * updateSourceFrame() frames the matching field in blue so the source is
+ * never ambiguous, and each level has its own revert. */
+function synthesisSourceInfo() {
   const compilerText = compiler?.input?.value?.trim() ?? '';
   if (compiler?.userEdited && compilerText) {
-    return {
-      text: compilerText, mode: 'phonetic', lang: state.lang,
-      speaker: state.speaker, expressive: state.expressive, f0: state.f0,
-      timings: { ...state.timings }, engine: state.engine, ortho: state.ortho,
-      outputMode: state.outputMode, guardPolicy: state.guardPolicy,
-      outputDir: state.outDir, label: state.outLabel || null,
-      exports: state.exports,
-      sandhi: state.sandhi, sandhiMode: state.sandhiMode,
-      _via: 'phonetic (compiler-edited blocks — your compiled structure)',
-    };
+    return { which: 'compiler', label: 'source: compiler blocks (syllabic edition)',
+             text: compilerText, mode: 'phonetic', ortho: false };
+  }
+  if (state.editedSampa !== null) {
+    return { which: 'sampa', label: 'source: edited final SAMPA',
+             text: state.editedSampa, mode: 'phonetic', ortho: false };
   }
   const orthoText = state.sources.ortho || '';
-  const orthoIntact = state.mode === 'ortho' && !state.editedSampa
-    && state.preview !== null && state.lastPreviewed === orthoText
-    && orthoText.trim().length > 0;
-  if (source === 'edited' && state.editedSampa !== null) {
-    return {
-      text: state.editedSampa, mode: 'phonetic', lang: state.lang,
-      speaker: state.speaker, expressive: state.expressive, f0: state.f0,
-      timings: { ...state.timings }, engine: state.engine, ortho: state.ortho,
-      outputMode: state.outputMode, guardPolicy: state.guardPolicy,
-      outputDir: state.outDir, label: state.outLabel || null,
-      exports: state.exports,
-      sandhi: state.sandhi, sandhiMode: state.sandhiMode,
-      _via: 'phonetic (the exact edited SAMPA)',
-    };
+  const orthoIntact = state.mode === 'ortho' && state.preview !== null
+    && state.lastPreviewed === orthoText && orthoText.trim().length > 0;
+  if (state.preview && orthoIntact) {
+    return { which: 'input', label: 'source: main input — previewed (deterministic G2P)',
+             text: orthoText, mode: 'ortho', ortho: true };
   }
+  if (state.preview) {
+    return { which: 'sampa', label: 'source: previewed SAMPA (input edited since preview)',
+             text: state.preview.final, mode: 'phonetic', ortho: false };
+  }
+  return { which: 'input', label: 'source: main input — preview pending',
+           text: orthoText, mode: 'ortho', ortho: true };
+}
+
+function updateSourceFrame() {
+  const info = synthesisSourceInfo();
+  const main = state.mode === 'ortho' ? $('#text-input') : $('#phonetic-input');
+  const editing = $('#sampa-edit-wrap') && $('#sampa-edit-wrap').style.display !== 'none';
+  const frames = {
+    input: main,
+    sampa: editing ? $('#sampa-edit') : $('#row-sampa-value'),
+    compiler: compiler?.input,
+  };
+  // clear EVERY candidate (the sampa editor and its row are two views of
+  // the same source — a stale frame on a closed editor is confusing)
+  for (const el of Object.values(frames)) el?.classList.remove('src-frame');
+  $('#sampa-edit')?.classList.remove('src-frame');
+  $('#row-sampa-value')?.classList.remove('src-frame');
+  frames[info.which]?.classList.add('src-frame');
+  const note = $('#src-note');
+  if (note) note.textContent = info.label;
+}
+
+function synthPayload(source) {
+  const info = synthesisSourceInfo();
+  const via = info.ortho
+    ? 'ortho (G2P deterministic — same SAMPA as preview)'
+    : `phonetic (${info.label.replace('source: ', '')})`;
   return {
-    text: orthoIntact ? orthoText : finalSampaOf(),
-    mode: orthoIntact ? 'ortho' : 'phonetic',
-    lang: state.lang,
-    speaker: state.speaker,
-    expressive: state.expressive,
-    f0: state.f0,
-    timings: { ...state.timings },
-    engine: state.engine,
-    ortho: state.ortho,
-    outputMode: state.outputMode,
-    guardPolicy: state.guardPolicy,
-    outputDir: state.outDir,
-    label: state.outLabel || null,
+    text: info.text, mode: info.mode, lang: state.lang,
+    speaker: state.speaker, expressive: state.expressive, f0: state.f0,
+    timings: { ...state.timings }, engine: state.engine, ortho: state.ortho,
+    outputMode: state.outputMode, guardPolicy: state.guardPolicy,
+    outputDir: state.outDir, label: state.outLabel || null,
     exports: state.exports,
     sandhi: state.sandhi, sandhiMode: state.sandhiMode,
-    _via: orthoIntact ? 'ortho (G2P deterministic — same SAMPA as preview)' : 'phonetic (the exact previewed/edited SAMPA)',
+    _via: via,
   };
 }
 
@@ -4841,9 +4251,12 @@ async function synthesize(source) {
 
 function onSynthesisDone(result, payload, source) {
   R.renderProgress({ stage: 'wav', state: 'done', progress: 1, polarReady: true, wavReady: true });
-  // audio element
+  // audio element — the WAV lives on the bridge origin: prefix with the
+  // probed apiBase when the page is served from a different port
   const audio = $('#audio-el');
-  if (result.wavUrl) audio.src = result.wavUrl;
+  const base = getApiBase();
+  const bridgeBase = (api.mode === 'live' && base && location.origin !== new URL(base).origin) ? base : '';
+  if (result.wavUrl) audio.src = bridgeBase + result.wavUrl;
   else if (result.files?.[0]?.blob) audio.src = URL.createObjectURL(result.files[0].blob);
   audio.load();
   // spectrogram — anchors with their labels/kinds + the phonetic units
@@ -5020,12 +4433,12 @@ function setBackendChip() {
     const st = api.health?.status || 'ok';
     dot.className = `dot ${st === 'ok' ? 'ok' : st === 'degraded' ? 'warn' : 'err'}`;
     label.textContent = `backend live · engine v${api.status?.version || '?'}`;
-    $('#demo-banner').style.display = 'none';
+    $('#offline-banner').style.display = 'none';
     if (st !== 'ok') R.log(`health: ${st} — ${JSON.stringify(api.health?.registry_warnings || [])}`);
   } else {
     dot.className = 'dot err';
-    label.textContent = 'backend offline — demo mode';
-    $('#demo-banner').style.display = '';
+    label.textContent = 'offline — start the bridge (python -m covtl_console)';
+    $('#offline-banner').style.display = '';
   }
   updateSandhiCapability();
 }
@@ -5089,7 +4502,7 @@ function setAppState(s) {
     'polar-running': 'Polar-only (live)',
     ready: 'Ready',
     playing: 'Playing',
-    'backend-offline': 'Backend offline',
+    'backend-offline': 'Bridge offline',
   };
   const chip = $('#state-chip');
   chip.textContent = map[s] || s;

@@ -10,7 +10,7 @@ import pytest
 
 from conftest import ENGINE_AVAILABLE, requires_engine
 
-JS_MODULES = ["data", "demo-engine", "render", "api", "polar", "spectrogram",
+JS_MODULES = ["data", "render", "api", "polar", "spectrogram",
               "compiler", "app"]
 
 

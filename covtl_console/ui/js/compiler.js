@@ -93,7 +93,7 @@ export class SyllableCompiler {
     this.rootEl = el('section', { class: 'zone zone-compiler', id: 'zone-compiler' });
     const head = el('header', { class: 'zone-head' },
       el('h2', { text: 'Syllable compiler' }),
-      el('span', { class: 'zone-sub', text: 'the engine’s articulation plan — auto-compiles the preview’s final SAMPA · type your own blocks to explore · no audio' }),
+      el('span', { class: 'zone-sub', text: 'the engine’s full symbolic output — anchors, blocks & polar trajectories (loaded into the display) · no audio' }),
       el('span', { class: 'head-gap' }),
       el('span', { class: 'compiler-src-note mono', id: 'compiler-src-note' }),
       el('button', { class: 'btn btn-primary', id: 'btn-compile',
@@ -122,6 +122,7 @@ export class SyllableCompiler {
     this.input.addEventListener('input', () => {
       this._seq = (this._seq || 0) + 1;      // stale responses must not land
       this.userEdited = this.input.value !== this._lastAuto;
+      this._updateRelink();
     });
 
     const presets = el('div', { class: 'chips-row compiler-presets' },
@@ -165,6 +166,10 @@ export class SyllableCompiler {
         el('div', { class: 'block-canvas-title' }, 'block cards', el('span', { class: 'dim', text: ' — click a card to inspect its structure; click again to collapse' })),
         this.canvas,
         el('div', { class: 'compiler-actions' },
+          el('button', { class: 'btn btn-sm', id: 'btn-compiler-relink', style: 'display:none',
+            'data-tip': 'Discard these manual blocks — the preview string becomes the compiled source again',
+            text: '↩ re-link to preview',
+            onclick: () => this.relink() }),
           el('button', { class: 'btn btn-sm', id: 'btn-compiler-send', text: 'Use in phonetic input →',
             'data-tip': 'Send to the phonetic input', onclick: () => this._send() }),
           el('span', { class: 'dim', id: 'compiler-link-note' })),
@@ -235,6 +240,7 @@ export class SyllableCompiler {
       }
       this.userEdited = false;
       this._lastAuto = sampa;
+      this._updateRelink();
       if (document.activeElement !== this.input) this.input.value = sampa;
       this.compile(sampa).catch(() => {});
     }, 120);
@@ -262,7 +268,9 @@ export class SyllableCompiler {
       this.result = r;
       this.selected = -1;
       this.userEdited = src !== this._lastAuto;   // explicit Compile of a manual string stays manual
+      this._updateRelink();
       this._render();
+      if (r.polar) this.opts.onPolarCompiled?.(r.polar);
       const m = r.metrics;
       const note = document.getElementById('compiler-result-note');
       note.style.display = '';
@@ -314,8 +322,8 @@ export class SyllableCompiler {
     this._renderBlockString(r);
     this._renderCanvas(r);
     const note = document.getElementById('compiler-src-note');
-    note.textContent = r.live ? 'engine: syltraj (live)' : 'demo arithmetic (approximate — labeled)';
-    note.className = `compiler-src-note mono ${r.live ? 'ok' : 'warn'}`;
+    note.textContent = 'engine: syltraj (live)';
+    note.className = 'compiler-src-note mono ok';
   }
 
   _renderTiles(r) {
@@ -430,6 +438,25 @@ export class SyllableCompiler {
     this.blockString.querySelectorAll('.bstr-chip').forEach((c, i) => {
       c.classList.toggle('playing', i === index);
     });
+  }
+
+  /* discard manual blocks — the preview string becomes the source again */
+  relink() {
+    this.userEdited = false;
+    const f = this.opts.getPreviewFinal?.();
+    if (f) {
+      this._lastAuto = f;
+      this.input.value = f;
+      this.compile(f).catch(() => {});
+    } else {
+      this._updateRelink();
+    }
+  }
+
+  _updateRelink() {
+    const b = document.getElementById('btn-compiler-relink');
+    if (b) b.style.display = this.userEdited ? '' : 'none';
+    this.opts.onSourceChanged?.();
   }
 
   _send() {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* spectrogram.js — spectrogram, phonetic segmentation overlay, time cursor.
  * The spectrogram is computed in the browser (radix-2 FFT, Hann window)
- * from the audio returned by the backend (or by the demo renderer), so the
+ * from the audio returned by the backend, so the
  * picture always shows the actual signal. In LIVE mode the server can also
  * supply a precomputed PNG; this renderer is the offline fallback. */
 

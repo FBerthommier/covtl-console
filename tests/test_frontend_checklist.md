@@ -12,7 +12,7 @@ must read **live**.
 
 ## Probe & mode switching
 
-- [ ] Cold load with the bridge down (static server): banner shows **demo
+- [ ] Cold load with the bridge down (static server): banner shows **offline
       mode**, surfaces labeled as simulated.
 - [ ] Bridge comes up → probe flips the UI to live without a manual reload
       of more than one poll cycle.
@@ -125,11 +125,11 @@ must read **live**.
       tract/polar only when optional exports are enabled; MP4 offered in
       sagittal mode.
 
-## Demo mode & standalone
+## Offline state & standalone
 
 - [ ] Demo mode: simulated G2P/guard/audio and the approximate compiler
       are clearly labeled as demo.
-- [ ] `covtl-console-standalone.html` opened from `file://`: full UI, demo
+- [ ] `covtl-console-standalone.html` opened from `file://`: full UI,
       engine; with the bridge running, it goes live on 127.0.0.1:8421.
 - [ ] Rebuild (`python build_standalone.py`) reproduces a working bundle.
 

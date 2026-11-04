@@ -34,7 +34,7 @@ python server.py
 ```
 
 Open <http://127.0.0.1:8421> in Chrome, Edge or Firefox. The header's
-backend chip must read **live** — if it reads *demo*, the engine was not
+backend chip must read **live** — if it reads *offline*, the engine was not
 importable in this interpreter and the console is simulating (see README
 §Installation for venv and per-system notes). The hint under the Prosody
 sandhi selects lists the rule languages the bridge actually has; if it
@@ -42,5 +42,4 @@ shows the *not installed* reason instead, step 1b was skipped and the
 sandhi level degrades to `off` with a warning.
 
 **No Python at all?** Double-click `covtl-console-standalone.html` — the
-console runs in clearly-labeled demo mode, and automatically uses a live
 bridge on 127.0.0.1:8421 whenever one is reachable.

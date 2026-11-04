@@ -158,7 +158,7 @@ export function renderResult({ duration, frames, phrases, warnings, live, source
     source ? el('span', { class: 'res-item res-src', text: source === 'sampa' ? 'from edited SAMPA · use_g2p=False' : 'from text · G2P' }) : null,
     cached ? el('span', { class: 'res-item res-cache', 'data-tip': 'Identical parameters — replayed from cache without engine work', text: 'cache hit' }) : null,
     warnings && warnings.length ? el('span', { class: 'res-item res-warn', text: `${warnings.length} warning${warnings.length > 1 ? 's' : ''}` }) : null,
-    el('span', { class: `res-item badge-${live ? 'live' : 'demo'}`, text: live ? 'live engine' : 'demo renderer' }),
+    el('span', { class: 'res-item badge-live', text: 'live engine' }),
   ];
   items.filter(Boolean).forEach((i) => box.append(i));
 }

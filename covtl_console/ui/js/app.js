@@ -12,7 +12,7 @@
  * The Python engine (through server.py) stays the single source of truth;
  * this file only owns presentation, transport and shortcuts.
  */
-import { api, cacheInfo, clearDemoCaches } from './api.js';
+import { api, cacheInfo, clearCaches, getApiBase } from './api.js';
 import * as R from './render.js';
 import {
   LANGUAGES, SPEAKERS, VOWELS, CONSONANTS, EXAMPLES,
@@ -80,13 +80,16 @@ async function init() {
     getTimings: () => state.timings,
     getGuardPolicy: () => state.guardPolicy,
     getLang: () => state.lang,
+    getPreviewFinal: () => finalSampaOf(),
     onSendToInput: (sampa) => useInPhoneticInput(sampa),
     onSeekSegment: (idx) => seekSegment(idx),
+    onPolarCompiled: (polar) => loadCompiledPolar(polar),
+    onSourceChanged: () => updateSourceFrame(),
     onLog: (m) => R.log(m),
   });
   const mode = await api.probe();
   setBackendChip();
-  if (mode === 'demo') $('#demo-banner').style.display = '';
+  if (mode === 'offline') $('#offline-banner').style.display = '';
   applyStateToControls();
   updateDerived();
   await convert();
@@ -95,16 +98,17 @@ async function init() {
   // the very first tab load after a bridge restart can race the server's
   // first-response warm-up — re-probe in the background and upgrade to
   // live (re-running the flows) without requiring the user to hit Retry
-  if (mode === 'demo' && location.protocol !== 'file:') {
+  if (mode === 'offline' && location.protocol !== 'file:') {
     for (const delay of [2000, 6000, 15000]) {
       setTimeout(async () => {
-        if (api.mode !== 'demo') return;
+        if (api.mode === 'live') return;
         await api.probe();
         if (api.mode === 'live') {
           setBackendChip();
-          previewCacheBust();
+          clearCaches();
           await convert();
-          R.log('backend came online — live engine engaged (auto-retry)');
+          compiler.compile(compiler.input.value || finalSampaOf()).catch(() => {});
+          R.log('bridge came online — console engaged (auto-retry)');
         }
       }, delay);
     }
@@ -112,9 +116,22 @@ async function init() {
   setInterval(refreshBackend, 15000);
 }
 
-function previewCacheBust() {
-  // demo-mode previews must not shadow live ones
-  clearDemoCaches();
+/* Compile delivers the engine's FULL symbolic output — anchors, blocks and
+ * the real polar trajectories (syltraj, no audio). The display runs in
+ * polar-only mode; Synthesize attaches the sound. */
+function loadCompiledPolar(polar) {
+  if (state.job.running) {
+    R.log('compile polar skipped — a synthesis job is running (its own trajectory will land)');
+    return;
+  }
+  state.polar = polar;
+  polarStage.detachAudio();
+  polarStage.setPayload(polar);
+  polarStage.seek(0);
+  buildScrubTicks();
+  $('#polar-status').textContent =
+    'compiled structure — polar-only (no audio) · Synthesize attaches the sound';
+  R.log(`compiled polar trajectories loaded: ${polar.segments.length} blocks / ${polar.anchors.length} anchors — display in polar-only mode`);
 }
 
 /* ═══════════════════════ static UI ═══════════════════════ */
@@ -360,7 +377,7 @@ function bindControls() {
   $('#btn-retry').addEventListener('click', async () => {
     await api.probe();
     setBackendChip();
-    clearDemoCaches();
+    clearCaches();
     convert();
   });
   $('#btn-inventory').addEventListener('click', () => {
@@ -373,13 +390,16 @@ function bindControls() {
   $('#btn-sampa-edit').addEventListener('click', openSampaEditor);
   $('#btn-sampa-apply').addEventListener('click', applySampaEdit);
   $('#btn-sampa-cancel').addEventListener('click', closeSampaEditor);
-  $('#btn-sampa-revert').addEventListener('click', () => {
+  const revertSampa = () => {
     state.editedSampa = null;
     closeSampaEditor();
     if (state.preview) state.sampaTokens = state.preview.tokens;
     if (state.preview) state.sampaRejected = state.preview.rejected;
     renderPreviewStack();
-  });
+    R.toast('SAMPA edit discarded — the previewed string is the synthesis source again', 'info');
+  };
+  $('#btn-sampa-revert').addEventListener('click', revertSampa);
+  $('#btn-sampa-revert-inline').addEventListener('click', revertSampa);
   $('#sampa-edit').addEventListener('input', debouncedGuardCheck);
   $('#sampa-edit').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); applySampaEdit(); }
@@ -509,6 +529,15 @@ function updateOutResolved() {
 }
 
 function updateSynthButtons() {
+  updateSourceFrame();
+  if (api.mode !== 'live') {
+    const btn = $('#btn-synth');
+    btn.disabled = true;
+    btn.textContent = 'Synthesize — bridge offline';
+    $('#btn-synth-edit').disabled = true;
+    $('#btn-preview').disabled = api.mode !== 'live';
+    return;
+  }
   const rej = state.sampaRejected.length;
   const hasPhonetic = state.sampaTokens.some((t) => t.kind === 'vowel' || t.kind === 'consonant');
   const btn = $('#btn-synth');
@@ -527,7 +556,7 @@ function updateSynthButtons() {
     btnE.disabled = true;
   } else if (!hasPhonetic) {
     btn.disabled = true;
-    btn.textContent = 'Synthesize — no phonetic content';
+    btn.textContent = 'Synthesize — the framed source has no vowels or consonants';
     btnE.disabled = true;
   } else if (state.guardPolicy === 'error' && rej > 0) {
     btn.disabled = true;
@@ -649,6 +678,12 @@ async function convert() {
   if (src.length > MAX_CHARS) return;
   // immediate feedback — under slow links the user must see the request
   // is in flight (the "nothing happens, then it lands later" bug)
+  if (api.mode !== 'live') {
+    setAppState('backend-offline');
+    $('#preview-status').textContent =
+      'Bridge offline — start it (python -m covtl_console); the console engages automatically.';
+    return;
+  }
   const btnP = $('#btn-preview');
   btnP.disabled = true;
   const oldLabel = btnP.textContent;
@@ -693,6 +728,7 @@ function renderPreviewStack() {
   const samRow = $('#row-sampa-value');
   g2pRow.innerHTML = ''; enrRow.innerHTML = ''; samRow.innerHTML = '';
   $('#badge-sampa-edited').style.display = state.editedSampa !== null ? '' : 'none';
+  $('#btn-sampa-revert-inline').style.display = state.editedSampa !== null ? '' : 'none';
 
   if (!p) {
     g2pRow.append(R.el('span', { class: 'dim', text: '—' }));
@@ -853,55 +889,70 @@ function useInPhoneticInput(sampa) {
  *    exact previewed/edited string goes through --phonetic (use_g2p=False).
  * Synthesize is DISABLED until a preview exists — everything is visible
  * before it can run. */
-function synthPayload(source) {
-  // priority 1 — the COMPILER output when the user edited its field: the
-  // brief's contract is that Synthesize speaks the compiled structure
+/* The ONE precedence rule for what Synthesize speaks:
+ *   1. compiler blocks you typed (syllabic edition)
+ *   2. the edited final SAMPA
+ *   3. the main input's preview (deterministic G2P when the text is intact)
+ * updateSourceFrame() frames the matching field in blue so the source is
+ * never ambiguous, and each level has its own revert. */
+function synthesisSourceInfo() {
   const compilerText = compiler?.input?.value?.trim() ?? '';
   if (compiler?.userEdited && compilerText) {
-    return {
-      text: compilerText, mode: 'phonetic', lang: state.lang,
-      speaker: state.speaker, expressive: state.expressive, f0: state.f0,
-      timings: { ...state.timings }, engine: state.engine, ortho: state.ortho,
-      outputMode: state.outputMode, guardPolicy: state.guardPolicy,
-      outputDir: state.outDir, label: state.outLabel || null,
-      exports: state.exports,
-      sandhi: state.sandhi, sandhiMode: state.sandhiMode,
-      _via: 'phonetic (compiler-edited blocks — your compiled structure)',
-    };
+    return { which: 'compiler', label: 'source: compiler blocks (syllabic edition)',
+             text: compilerText, mode: 'phonetic', ortho: false };
+  }
+  if (state.editedSampa !== null) {
+    return { which: 'sampa', label: 'source: edited final SAMPA',
+             text: state.editedSampa, mode: 'phonetic', ortho: false };
   }
   const orthoText = state.sources.ortho || '';
-  const orthoIntact = state.mode === 'ortho' && !state.editedSampa
-    && state.preview !== null && state.lastPreviewed === orthoText
-    && orthoText.trim().length > 0;
-  if (source === 'edited' && state.editedSampa !== null) {
-    return {
-      text: state.editedSampa, mode: 'phonetic', lang: state.lang,
-      speaker: state.speaker, expressive: state.expressive, f0: state.f0,
-      timings: { ...state.timings }, engine: state.engine, ortho: state.ortho,
-      outputMode: state.outputMode, guardPolicy: state.guardPolicy,
-      outputDir: state.outDir, label: state.outLabel || null,
-      exports: state.exports,
-      sandhi: state.sandhi, sandhiMode: state.sandhiMode,
-      _via: 'phonetic (the exact edited SAMPA)',
-    };
+  const orthoIntact = state.mode === 'ortho' && state.preview !== null
+    && state.lastPreviewed === orthoText && orthoText.trim().length > 0;
+  if (state.preview && orthoIntact) {
+    return { which: 'input', label: 'source: main input — previewed (deterministic G2P)',
+             text: orthoText, mode: 'ortho', ortho: true };
   }
+  if (state.preview) {
+    return { which: 'sampa', label: 'source: previewed SAMPA (input edited since preview)',
+             text: state.preview.final, mode: 'phonetic', ortho: false };
+  }
+  return { which: 'input', label: 'source: main input — preview pending',
+           text: orthoText, mode: 'ortho', ortho: true };
+}
+
+function updateSourceFrame() {
+  const info = synthesisSourceInfo();
+  const main = state.mode === 'ortho' ? $('#text-input') : $('#phonetic-input');
+  const editing = $('#sampa-edit-wrap') && $('#sampa-edit-wrap').style.display !== 'none';
+  const frames = {
+    input: main,
+    sampa: editing ? $('#sampa-edit') : $('#row-sampa-value'),
+    compiler: compiler?.input,
+  };
+  // clear EVERY candidate (the sampa editor and its row are two views of
+  // the same source — a stale frame on a closed editor is confusing)
+  for (const el of Object.values(frames)) el?.classList.remove('src-frame');
+  $('#sampa-edit')?.classList.remove('src-frame');
+  $('#row-sampa-value')?.classList.remove('src-frame');
+  frames[info.which]?.classList.add('src-frame');
+  const note = $('#src-note');
+  if (note) note.textContent = info.label;
+}
+
+function synthPayload(source) {
+  const info = synthesisSourceInfo();
+  const via = info.ortho
+    ? 'ortho (G2P deterministic — same SAMPA as preview)'
+    : `phonetic (${info.label.replace('source: ', '')})`;
   return {
-    text: orthoIntact ? orthoText : finalSampaOf(),
-    mode: orthoIntact ? 'ortho' : 'phonetic',
-    lang: state.lang,
-    speaker: state.speaker,
-    expressive: state.expressive,
-    f0: state.f0,
-    timings: { ...state.timings },
-    engine: state.engine,
-    ortho: state.ortho,
-    outputMode: state.outputMode,
-    guardPolicy: state.guardPolicy,
-    outputDir: state.outDir,
-    label: state.outLabel || null,
+    text: info.text, mode: info.mode, lang: state.lang,
+    speaker: state.speaker, expressive: state.expressive, f0: state.f0,
+    timings: { ...state.timings }, engine: state.engine, ortho: state.ortho,
+    outputMode: state.outputMode, guardPolicy: state.guardPolicy,
+    outputDir: state.outDir, label: state.outLabel || null,
     exports: state.exports,
     sandhi: state.sandhi, sandhiMode: state.sandhiMode,
-    _via: orthoIntact ? 'ortho (G2P deterministic — same SAMPA as preview)' : 'phonetic (the exact previewed/edited SAMPA)',
+    _via: via,
   };
 }
 
@@ -963,9 +1014,12 @@ async function synthesize(source) {
 
 function onSynthesisDone(result, payload, source) {
   R.renderProgress({ stage: 'wav', state: 'done', progress: 1, polarReady: true, wavReady: true });
-  // audio element
+  // audio element — the WAV lives on the bridge origin: prefix with the
+  // probed apiBase when the page is served from a different port
   const audio = $('#audio-el');
-  if (result.wavUrl) audio.src = result.wavUrl;
+  const base = getApiBase();
+  const bridgeBase = (api.mode === 'live' && base && location.origin !== new URL(base).origin) ? base : '';
+  if (result.wavUrl) audio.src = bridgeBase + result.wavUrl;
   else if (result.files?.[0]?.blob) audio.src = URL.createObjectURL(result.files[0].blob);
   audio.load();
   // spectrogram — anchors with their labels/kinds + the phonetic units
@@ -1142,12 +1196,12 @@ function setBackendChip() {
     const st = api.health?.status || 'ok';
     dot.className = `dot ${st === 'ok' ? 'ok' : st === 'degraded' ? 'warn' : 'err'}`;
     label.textContent = `backend live · engine v${api.status?.version || '?'}`;
-    $('#demo-banner').style.display = 'none';
+    $('#offline-banner').style.display = 'none';
     if (st !== 'ok') R.log(`health: ${st} — ${JSON.stringify(api.health?.registry_warnings || [])}`);
   } else {
     dot.className = 'dot err';
-    label.textContent = 'backend offline — demo mode';
-    $('#demo-banner').style.display = '';
+    label.textContent = 'offline — start the bridge (python -m covtl_console)';
+    $('#offline-banner').style.display = '';
   }
   updateSandhiCapability();
 }
@@ -1211,7 +1265,7 @@ function setAppState(s) {
     'polar-running': 'Polar-only (live)',
     ready: 'Ready',
     playing: 'Playing',
-    'backend-offline': 'Backend offline',
+    'backend-offline': 'Bridge offline',
   };
   const chip = $('#state-chip');
   chip.textContent = map[s] || s;
