@@ -52,6 +52,39 @@ def test_breath_input_has_breath_anchor():
     assert breath[0]["kind"] == "pause"
 
 
+def test_geminate_shared_target_segment():
+    """Shared-target configuration for the polar label suffix (the
+    `i·n` checklist item, flash-validation PARTIAL 2026-11-04): within
+    ONE journey (anchor pair) a phoneme key must appear twice so the
+    display's label dedupe (polar.js — same key + same target position)
+    renders `t·2` instead of two separate labels. A word-internal
+    geminate produces exactly that: 'atta' walks a→a with a single
+    cluster block carrying cons_keys ['t','t'] (VVV runs split across
+    journeys — which is why no natural phrase of the campaign ever
+    showed the suffix)."""
+    import server as S
+    st = S.structure_compile("atta", "en")
+    anchors, blocks = st["anchors"], st["blocks"]
+    hits = []
+    for k in range(len(anchors) - 1):
+        a0, a1 = anchors[k], anchors[k + 1]
+        span = [b for b in blocks if b["t0"] < a1["t"] - 1e-9
+                and b["t1"] > a0["t"] + 1e-9]
+        keys: list = []
+        for b in span:
+            if b["kind"] == "plateau" and b.get("vowel_key"):
+                keys.append(b["vowel_key"])
+            keys.extend(b.get("cons_keys") or [])
+        dups = {key for key in keys if keys.count(key) > 1}
+        if dups:
+            hits.append((k, a0["label"], a1["label"], sorted(dups)))
+    assert hits, (
+        "no journey of 'atta' carries a duplicated phoneme key — the "
+        "shared-target label suffix has no data to count")
+    assert any(d == ["t"] for _, _, _, d in hits), (
+        f"expected the a->a geminate journey to duplicate 't': {hits}")
+
+
 @pytest.mark.parametrize("text", RIGOR_PHRASES)
 def test_structure_invariants(structures, text):
     """Anchor list sanity shared by every rigor phrase: non-decreasing
