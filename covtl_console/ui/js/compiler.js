@@ -458,6 +458,16 @@ export class SyllableCompiler {
     });
   }
 
+  /* upstream propagation (step 1 → step 2, user directive: upstream wins):
+   * always recompile the new source — manual blocks are replaced, noted by
+   * a toast from app.js */
+  follow(sampa) {
+    this.userEdited = false;
+    this._lastAuto = sampa;
+    this.input.value = sampa;
+    this.compile(sampa).catch(() => {});
+  }
+
   /* discard manual blocks — the preview string becomes the source again */
   relink() {
     this.userEdited = false;

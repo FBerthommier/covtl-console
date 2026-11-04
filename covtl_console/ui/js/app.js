@@ -49,6 +49,7 @@ const state = {
   lastPreviewed: null,        // input the current preview stack represents
   preview: null,
   editedSampa: null,
+  editedBase: null,
   sampaTokens: [],
   sampaRejected: [],
   job: { id: null, running: false, cancel: null },
@@ -395,7 +396,7 @@ function bindControls() {
     if (state.preview) state.sampaTokens = state.preview.tokens;
     if (state.preview) state.sampaRejected = state.preview.rejected;
     renderPreviewStack();
-    compiler?.maybeAutoCompile(finalSampaOf());
+    compiler?.follow(finalSampaOf());
     R.toast('SAMPA edit discarded — the previewed string is the synthesis source again', 'info');
   };
   $('#btn-sampa-revert').addEventListener('click', revertSampa);
@@ -686,12 +687,21 @@ async function convert() {
     state.lastPreviewed = src;           // what the preview stack represents
     state.sampaTokens = out.tokens;
     state.sampaRejected = out.rejected;
+    // upstream-wins: an edited SAMPA is a child of the preview it edits —
+    // when the upstream text has changed, the stale edit is discarded so
+    // the modification propagates all the way down (user directive)
+    if (state.editedSampa !== null && state.editedBase !== out.final) {
+      state.editedSampa = null;
+      state.editedBase = null;
+      R.toast('Upstream changed — the edited SAMPA no longer matched the preview and was discarded', 'info');
+    }
     if (state.editedSampa !== null) {
       await guardRefreshEdited();
     }
     renderPreviewStack();
-    // step 2 follows step 1 — the compiler panel tracks the final SAMPA
-    compiler?.maybeAutoCompile(finalSampaOf());
+    // step 2 follows step 1 — the compiler panel ALWAYS tracks the final
+    // SAMPA (manual blocks are replaced: upstream wins)
+    compiler?.follow(finalSampaOf());
     if (out.cached) R.log('preview cache hit');
   } catch (err) {
     if (seq === previewSeq) showError(err, 'Preview failed');
@@ -817,12 +827,13 @@ function closeSampaEditor() {
 async function applySampaEdit() {
   const v = $('#sampa-edit').value;
   state.editedSampa = v;
+  state.editedBase = state.preview?.final ?? null;
   closeSampaEditor();
   await guardRefreshEdited();
   renderPreviewStack();
   // step 2 follows the EDITED string too: the compiler panel always shows
   // the structure of the current synthesis source
-  compiler?.maybeAutoCompile(finalSampaOf());
+  compiler?.follow(finalSampaOf());
 }
 
 function stripRejected() {
@@ -830,7 +841,7 @@ function stripRejected() {
   state.editedSampa = keep;
   guardRefreshEdited().then(() => {
     renderPreviewStack();
-    compiler?.maybeAutoCompile(finalSampaOf());
+    compiler?.follow(finalSampaOf());
   });
   R.log(`stripped ${state.sampaRejected.length} rejected symbol(s) — final SAMPA marked edited`);
 }
@@ -953,7 +964,7 @@ async function synthesize(source) {
   if (!payload.text.trim()) { R.toast('Nothing to synthesize — preview first (P or word end).', 'warn'); return; }
   if (payload.text.length > MAX_CHARS) { R.toast(`Source too long (${payload.text.length} > ${MAX_CHARS} chars).`, 'warn'); return; }
   R.log(`synthesize uses: ${payload._via}`);
-  const srcLabel = payload._src;
+  state.lastSrcLabel = payload._src || 'text';
   delete payload._via;
   delete payload._src;
   state.job = { id: null, running: true, cancel: { cancelled: false } };
@@ -1049,7 +1060,7 @@ function onSynthesisDone(result, payload, source) {
   $('#polar-status').textContent = 'synced to audio clock';
   R.renderResult({
     duration: result.duration, frames: result.frames, phrases: result.phrases,
-    warnings: result.warnings, live: result.live, source: srcLabel || 'text',
+    warnings: result.warnings, live: result.live, source: state.lastSrcLabel,
     cached: result.cached, anchors: result.polar ? result.polar.anchors : null,
     blocks: result.blockCount,
   });
