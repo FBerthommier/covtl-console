@@ -53,15 +53,21 @@ def test_breath_input_has_breath_anchor():
 
 
 def test_geminate_shared_target_segment():
-    """Shared-target configuration for the polar label suffix (the
-    `i·n` checklist item, flash-validation PARTIAL 2026-11-04): within
-    ONE journey (anchor pair) a phoneme key must appear twice so the
-    display's label dedupe (polar.js — same key + same target position)
-    renders `t·2` instead of two separate labels. A word-internal
-    geminate produces exactly that: 'atta' walks a→a with a single
-    cluster block carrying cons_keys ['t','t'] (VVV runs split across
-    journeys — which is why no natural phrase of the campaign ever
-    showed the suffix)."""
+    """Closest reachable configuration to the polar label suffix `i·n`
+    (flash-validation PARTIAL → N/A, 2026-11-04 correction round): a
+    word-internal geminate makes ONE journey (anchor pair) carry the
+    same phoneme key twice — 'atta' walks a->a with a single cluster
+    block holding cons_keys ['t','t']. The suffix itself was never
+    observed live and cannot be: a 50-candidate sweep (geminates,
+    repeated vowels, VV runs, split clusters) shows the engine's arc
+    geometry keeps the two occurrences at DIFFERENT positions (for
+    'atta': rho 0.40/theta 231° vs rho 0.65/theta 173° — a monotone
+    interpolation, never a revisit), and two plateaus of the same vowel
+    never share a journey (consecutive identical vowels build background
+    arcs, not plateaus). polar.js's dedup stays as correct defensive
+    code; this test pins the duplicated-key journey so a future engine
+    that plateaus geminates at a shared target has a data-level probe
+    ready."""
     import server as S
     st = S.structure_compile("atta", "en")
     anchors, blocks = st["anchors"], st["blocks"]
