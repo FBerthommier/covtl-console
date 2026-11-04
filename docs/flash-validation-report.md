@@ -74,6 +74,8 @@ shim still imports (`import server` → `covtl_console.server`, FastAPI
 app); `build_standalone.py` rebuild is byte-identical (bundle tests
 6/6). `.tract` files run at **400 Hz** (not the 100 Hz walk rate) —
 the probe maps step windows onto rows by `n_rows / n_steps`.
+*(Confirmed intentional and locked by a contract test on 2026-11-04 —
+see Correction round §400 Hz.)*
 
 ## Volet (b) — browser checklist — 35 PASS · 1 PARTIAL · 1 nit-FAIL · 2 N/A · 1 superseded
 
@@ -151,7 +153,8 @@ same handlers (harness note H1).
   artifacts written). **Nit-FAIL:** the downloads menu is hidden but
   not emptied — re-opening `D` after a reset shows the previous job's
   entries (`app.js` reset hides `#dl-menu` without clearing it; the
-  checklist asks for it to be cleared).
+  checklist asks for it to be cleared). *(Resolved 2026-11-04 — see
+  Correction round §F2.)*
 - Fresh preview after reset — **PASS** (immediate; language, speaker,
   timings and history untouched by the reset).
 
@@ -183,7 +186,9 @@ same handlers (harness note H1).
   and renders `text·count` when count > 1), but no tested string
   (`Dis.iz…`, `iowa a g`, the hiatus pairs) produces two same-target
   blocks **within one journey** — VVV runs split across journeys — so
-  the suffix was never observed live.
+  the suffix was never observed live. *(Closed N/A justified
+  2026-11-04 — measured unreachable under current engine geometry; see
+  Correction round §i·n.)*
 - Journey-centric display — **PASS**: per-journey label batches only
   (verified by clearing a `fillText` recorder between steps); no
   watermark of past journeys; clean switch at anchor boundaries.
@@ -207,6 +212,7 @@ same handlers (harness note H1).
   containing `.`: bridge `ta~.a~ta` → `ta__a_ta.polar` vs engine
   `ta_.a_ta.*`; the offer glob runs on the engine stem only). MP4 in
   sagittal mode — **N/A** this run (slow-lane job covers it nightly).
+  *(F1 fixed 2026-11-04 — see Correction round §F1.)*
 
 ### Offline state & standalone
 
@@ -257,7 +263,9 @@ same handlers (harness note H1).
   — the stem-sanitizer mismatch described above; the file exists and
   feeds the display, it just never enters the offered-files glob).
   Never hit by the e2e because it sends explicit labels.
+  *(Fixed 2026-11-04 — see Correction round §F1.)*
 - **F2 — downloads menu not emptied by reset** (nit; see the item).
+  *(Fixed 2026-11-04 — see Correction round §F2.)*
 - **F3 — synced display never replaced by a later compile**
   (deliberate, `0fc562c`): after a synthesis, compiling a different
   string keeps the audio-synced display; the new plan loads on the
@@ -303,3 +311,143 @@ Suggested order: publish `covtl-sandhi` 0.1.0 → `vtl-synth` 1.1.0 →
 `covtl-console` 3.1.0, then flip the console's dependencies to the
 registry and re-run `tests/flash_e2e.py` (now the true user path,
 minus the git resolution) plus the flash CI job before tagging.
+
+## Correction round (2026-11-04, evening) — every open item closed
+
+Executed per the maintainer's correction prompt on top of `f9884af`.
+One commit per item; **no version bump**; `ci.yml` untouched; the
+8421/8422/8423 servers were never touched — manual verification ran on
+a dedicated port 8430 against the corrected wheel force-reinstalled
+into `.venv-covtl`.
+
+| item | campaign status | status now | commit |
+|---|---|---|---|
+| F2 — downloads menu not emptied by reset | nit-FAIL | **PASS** (emptied + live-verified) | `e37ead1` |
+| shared-target labels (`i·n`) | PARTIAL | **N/A justified** (measured unreachable) | `71282e2` + `040b7a8` |
+| F1 — polar download lost for dotted inputs | finding (minor) | **PASS** (engine stem everywhere) | `8e1f1d8` |
+| 400 Hz tract vs 100 Hz walk | intentional, open | **contract documented + locked** | `b1eaf1d` |
+| TestPyPI publication | not prepared | **workflow ready** (manual dispatch only) | `594fa13` |
+
+### §F2 — reset empties the downloads menu — PASS
+
+`resetInputs()` hid `#dl-menu` without clearing it. The menu content
+is the single source of truth for the entries (rebuilt from
+`result.files` on each synthesis; there is no persisted download
+state), so the reset now also re-renders it empty — reopening `D`
+shows the no-artifacts state. Non-regression:
+`tests/test_ui_sources.py::test_reset_empties_downloads_menu` (source
+contract, engine-less, runs in CI on both OS). Live verification
+(port 8430): after a `ta~.a~ta` synthesis the menu offered 4 entries;
+Reset input → chip *Empty*; reopening `D` shows
+`No artifacts yet — synthesize first.` with **0 stale items** (before
+the fix the previous job's 4 entries reappeared).
+
+### §F1 — early artifacts on the engine stem — PASS
+
+Exact divergence, documented before fixing (old bridge
+`re.sub(r"[^A-Za-z0-9_\-]", "_", text[:28]).strip("_")` vs the engine's
+`label_of` + `Pipeline.run`'s `.rstrip("._")`):
+
+| input | old bridge stem | engine stem |
+|---|---|---|
+| `ta~.a~ta` (report's case) | `ta__a_ta` | `ta_.a_ta` |
+| `foo.bar` / `foo.bar.wav` | `foo_bar` / `foo_bar_wav` | `foo.bar` / `foo.bar.wav` |
+| `ta-a` (hyphen) | `ta-a` | `ta_a` |
+| `café` (non-ASCII) | `caf` | `café` |
+| `a.b-c_d e` | `a_b-c_d_e` | `a.b_c_d_e` |
+| `ta_a`, `ba da`, `klinpan` | identical | identical |
+| specials only (`...`) | `output` | `output` |
+| long inputs | truncated to 28 **before** substitution | truncated to 30 **after** + `rstrip("._")` |
+
+Dots, hyphens and non-ASCII all made the early `.polar` invisible to
+the offer glob (dotted inputs were simply the observed case). The
+bridge now delegates to the engine's own
+`vtl_synth.core.pipeline.label_of` — the import cannot fail (`Pipeline`
+is imported from that very module two lines above) — computing
+`stem = (label or label_of(text)).rstrip("._") or "output"`, exactly
+`Pipeline.run`'s formula, so the two stems are identical by
+construction. Non-regression:
+`tests/test_synthesis.py::test_dotted_input_offers_polar_download`
+(`ta~.a~ta` → offers `ta_.a_ta.polar`, file on disk, HTTP 200).
+Live verification (port 8430): the downloads menu for `ta~.a~ta`
+lists polar + tract + txt + wav, all under `ta_.a_ta.*`.
+
+### §i·n — shared-target label suffix — N/A justified
+
+Live observation was attempted with the minimal synthetic input that
+produces the configuration: a word-internal geminate. `atta` walks
+a→a with ONE cluster block carrying `cons_keys ['t','t']` — the only
+reachable "same phoneme twice in one journey" case (VVV runs split
+across journeys; consecutive identical vowels build background arcs).
+A `fillText` recorder over a full scrub sweep of the live display
+drew `a`, `t`, `▸`, `◂`, `␣` (+ block-strip labels) and **no `t·2`**.
+
+Reason, measured on the live payload: polar.js's dedup key includes
+the target position (`key = 'C:'+ck+':'+rho.toFixed(2)+':'+theta.toFixed(0)`),
+and the engine's consonantal arc interpolates monotonically between
+the surrounding vowel targets — the geminate's two t's ride different
+flanks of the excursion: **t at (ρ 0.40, θ 231°) and (ρ 0.65, θ 173°)**
+— never the same rounded position. A 50-candidate sweep (geminates
+`atta/abba/akka/adda/appa/ab.ba/abb.a/ab.bba/at.ta/ibbi/uddu`, repeated
+vowels `aa/ii/aaa/a.a/i.i`, mixed VV runs, tri-consonants `bbb/atsta`,
+the worked example, the e2e phrases) replicating polar.js's keys
+exactly over `/api/compile` payloads found **zero** collisions in any
+journey. The other collision path — two plateaus of the same vowel
+inside one journey — is structurally impossible: each vowel anchor's
+plateau belongs to the journey starting at that anchor.
+
+Conclusion: the suffix is correct defensive code (it would render
+`t·2` the day the engine plateaus a geminate at a shared target) but
+unreachable through any input under the current engine geometry. The
+checklist item moves PARTIAL → **N/A justified**;
+`tests/test_structure.py::test_geminate_shared_target_segment` pins
+the duplicated-key journey and documents the measured geometry so a
+changed engine has a data-level probe ready.
+
+### §400 Hz — tract/walk rate contract documented and locked
+
+Maintainer-confirmed: the `.tract` files are **400 Hz by construction**
+(engine `TRACT_SR`) — a contract, not a bug; the production rate is
+unchanged. The walk (structure blocks, `.polar` payload, display) runs
+its own 100 Hz grid and never reads the `.tract` directly; the repo's
+tract consumer — `tests/_flash_vo_probe.py` — maps walk step windows
+onto tract rows explicitly (`scale = n_rows / n_steps`, measured 4.0,
+reported as `tract_hz_per_step` in the e2e log). Locked by
+`tests/test_synthesis.py::test_tract_400hz_walk_100hz_contract`:
+`.tract` header `sample_rate == 400`, `n_frames == 4 × walk steps`
+(measured 544 = 4 × 136 on `ba da`), payload `sample_rate == 100`,
+`duration × 100 == steps`. Contract docstrings added at the
+artifact-adoption point in `server.py` and in the probe.
+
+### §TestPyPI — publish.yml ready (manual trigger only)
+
+`.github/workflows/publish.yml` (ci.yml untouched): `workflow_dispatch`
+only, environment `testpypi` (the maintainer's pending publishers),
+`pypa/gh-action-pypi-publish` against `https://test.pypi.org/legacy/`,
+sequential publication `covtl-sandhi` → `vtl-synth` → `covtl-console`
+in one job (order guaranteed), each stamped to a PEP 440 test version
+(`upstream + .devN`, default `dev1`, empty input falls back to
+`dev<run number>`). Every dependency-resolving pip install carries
+`--extra-index-url https://pypi.org/simple/` (TestPyPI holds no
+production dependency). Validated: actionlint 1.7.12 clean, YAML
+parse, and the stamping logic exercised against the three real
+pyprojects (→ 0.1.0.dev1 / 1.1.0.dev1 / 3.1.0.dev1). Known limitation
+(documented in the workflow): the console wheel's engine deps are
+still git+ pins, so its TestPyPI install resolves those from GitHub —
+the proven flash path — until the registry flip; the upstream wheels
+themselves are smoke-installed from TestPyPI in a separate venv.
+The publication itself is **ready to be tested manually** by the
+maintainer (Actions → publish (TestPyPI) → Run workflow).
+
+### Re-validation on the corrected tree
+
+- Fast suite (engine-backed, Windows): **53 passed / 1 deselected** —
+  the campaign's 49 + the four new tests (F2 source contract, F1
+  dotted polar, 400 Hz contract, geminate journey).
+- `tests/flash_e2e.py`: **PASSED** — same evidence chain as volet (a)
+  (wheel → scratch venv → live server; compile 14 anchors / 20 blocks /
+  3.96 s; start-early ordering observed; VO gates 0.4701 / 0.4701 /
+  0.4973 vs oral control −0.100; three pairwise-distinct WAVs;
+  `faut il` → `fo.til`; clean uninstall + venv teardown).
+- Browser re-verification of the two fixed behaviors: see §F2 and §F1
+  above (port 8430, corrected wheel).
