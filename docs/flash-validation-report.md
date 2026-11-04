@@ -449,5 +449,10 @@ maintainer (Actions → publish (TestPyPI) → Run workflow).
   3.96 s; start-early ordering observed; VO gates 0.4701 / 0.4701 /
   0.4973 vs oral control −0.100; three pairwise-distinct WAVs;
   `faut il` → `fo.til`; clean uninstall + venv teardown).
+- CI on GitHub after the push: run
+  [41889475385](https://github.com/FBerthommier/covtl-console/actions/runs/41889475385)
+  — **success**, all six jobs (tests ubuntu + windows with the four new
+  tests, flash install e2e ubuntu + windows, standalone bundle, LaTeX
+  manuals; slow lane skipped as usual on push).
 - Browser re-verification of the two fixed behaviors: see §F2 and §F1
   above (port 8430, corrected wheel).
