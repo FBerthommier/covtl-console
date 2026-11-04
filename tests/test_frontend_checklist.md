@@ -28,6 +28,9 @@ must read **live**.
       `python server.py` and `import server` from the repo still work
       (root shim). `python install_flash.py` creates `.venv-covtl` and
       writes `run_console.bat`/`run_console.sh`.
+      (Automatable counterpart: `tests/flash_e2e.py` — wheel build,
+      scratch venv, entry point, live HTTP chain, nasal-hiatus VO,
+      uninstall; run it before this manual walk.)
 
 - [ ] Word-end auto-preview fires when finishing a word (space / word
       boundary); typing **mid-word must NOT fire** a preview.

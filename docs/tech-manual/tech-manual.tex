@@ -430,6 +430,32 @@ The build is rebuildable at any time
 bundle compiles (\texttt{node --check}), registers all 8 modules, keeps
 no ES-module imports and carries the per-language example labels.
 
+\section{Test surfaces}
+
+Four lanes, all driven from \texttt{tests/}:
+\begin{itemize}
+\item \textbf{Fast suite} (\texttt{pytest tests/ -m "not slow"}): API
+  contract, guard semantics, packaging, structure --- TestClient over
+  the in-process bridge; engine-required tests skip with an explicit
+  reason when \texttt{vtl\_synth} is absent.
+\item \textbf{Slow lane} (\texttt{-m slow}, nightly CI): real synthesis
+  jobs, the MP4 path.
+\item \textbf{Flash e2e} (\texttt{tests/flash\_e2e.py}, CI job
+  \texttt{flash}): builds the wheel, installs it into a scratch venv
+  (engine and covtl-sandhi resolve from GitHub through the wheel
+  metadata), starts the installed \texttt{covtl-console} entry point
+  and replays the live chain over HTTP --- health, fr preview with
+  liaison, compile metrics, start-early ordering, WAV-versus-structure
+  duration, and the nasal-hiatus VO gate measured inside the engine's
+  own \texttt{nasal\_hiatus\_intervals} windows (tract column~7,
+  $\geq$0.4 max / 0.3 middle-half mean; oral control $\leq$0.2) ---
+  then uninstalls and deletes the venv. The VO probe
+  (\texttt{\_flash\_vo\_probe.py}) runs inside the scratch interpreter,
+  where the engine lives.
+\item \textbf{Frontend checklist} (\texttt{test\_frontend\_checklist.md}):
+  the manual browser series for release sign-off.
+\end{itemize}
+
 \section{Known environment quirks}
 
 \begin{itemize}

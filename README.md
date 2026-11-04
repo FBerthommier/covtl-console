@@ -330,6 +330,19 @@ pytest tests/ -v            # add -m "not slow" to skip long synthesis jobs
 `tests/test_frontend_checklist.md` is the manual browser series used for
 release sign-off.
 
+**Flash install end-to-end** — `tests/flash_e2e.py` proves the pip
+package as a user would get it: it builds the wheel from the checkout,
+installs it into a scratch venv (engine + covtl-sandhi resolve from
+GitHub), starts the installed `covtl-console` entry point on a free
+port and replays the live chain over HTTP (health, fr preview with
+liaison, compile metrics, start-early synthesis, nasal-hiatus VO
+measured inside the engine's own interval windows, uninstall).
+Several minutes — the engine wheel build dominates:
+
+```bash
+python tests/flash_e2e.py     # log: flash_e2e.log · CI: job "flash"
+```
+
 ## Licensing
 
 covtl-console is licensed **GPL-3.0-or-later** — the same license as

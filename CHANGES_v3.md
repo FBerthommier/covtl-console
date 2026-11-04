@@ -244,3 +244,31 @@ console tracks both.
   engine 1.1.0 + covtl-sandhi 0.1.0 + console 3.1.0 from GitHub,
   `covtl-console --port 8422` came up LIVE (fr active, sandhi
   available, six languages, UI served from site-packages).
+
+## L. Addendum (2026-11-04) — flash-install validation campaign
+
+- **`tests/flash_e2e.py`** — the one-command flash install, proven end
+  to end as a user gets it: wheel built from the checkout
+  (`python -m build`), installed into a bare scratch venv (git deps
+  resolve from the wheel metadata), entry point `covtl-console`
+  started as a subprocess on a free port, and the real chain replayed
+  over HTTP against the installed server: health (live engine, sandhi
+  available, six rule languages), fr preview `bonjour, comment
+  allez-vous` @ standard → `bO~ZuR kOma~.ta.le.vu` (liaison `t`),
+  compile 14 anchors / 20 blocks / 3.96 s ± 1 step (the liaison
+  variant; the no-sandhi string is 18 blocks / 3.68 s), synthesis with
+  polar_ready observed BEFORE wav_ready and WAV duration = structure
+  ± 40 ms, the three hiatus pairs `ta~.ata` / `ta.a~ta` / `ta~.a~ta`
+  as pairwise-distinct WAVs with the velum opening measured inside the
+  engine's `nasal_hiatus_intervals` windows (tract column 7: max ≥ 0.4,
+  middle-half mean ≥ 0.3 — the 0.5 target ramps to −0.1 at the edges
+  and the 20 ms velar timer rounds the plateau; oral control `ta.ata`
+  ≤ 0.2), liaison `faut il` → `fo.til`, then clean `pip uninstall` and
+  scratch-venv deletion. Helper `tests/_flash_vo_probe.py` runs in the
+  scratch interpreter (where the engine lives) and recomputes the
+  intervals with the engine's own walk; the .tract file runs at 400 Hz,
+  so step windows are mapped onto rows by `n_rows / n_steps`.
+- **CI job `flash`** (ubuntu + windows, py3.12) runs the script on the
+  pushed commit and uploads `flash_e2e.log` — the same path a user's
+  `pip install` takes, exercised on both OSes on every push.
+- Evidence and divergences: `docs/flash-validation-report.md`.
