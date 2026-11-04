@@ -21,6 +21,11 @@
 
 \section{Architecture}
 
+
+\textbf{No offline mode.} The browser demo engine was removed: the console has no offline mode. Without the bridge every action stays disabled behind an explicit offline banner, and the probe runs over candidate bridge origins (same origin first, then 127.0.0.1:8421), engaging automatically when the bridge answers. The single Synthesize button speaks the blue-framed source: main input
+(deterministic G2P), edited final SAMPA, or compiler blocks --- one
+precedence rule, one button.
+
 Three tiers, all local:
 
 \begin{verbatim}
@@ -35,9 +40,10 @@ The Python engine is the single source of truth for every phonetic
 decision; the browser only previews, displays and controls. When
 \texttt{vtl\_synth} is not importable, the bridge answers
 \texttt{/api/status} with \texttt{backend:"mock"} and every
-engine-dependent endpoint returns a structured 503; the UI then runs its
-browser demo engine (\texttt{js/demo-engine.js}) --- same interface,
-approximate behavior, labeled as demo.
+engine-dependent endpoint returns a structured 503; the UI stays in an
+explicit offline state (banner naming the start command, buttons
+disabled) and its probe keeps retrying candidate bridge origins until
+the bridge answers --- there is no simulated engine.
 
 \subsection{Module map (\texttt{covtl\_console/ui/js/})}
 
@@ -51,18 +57,14 @@ README. Module map:
 
 \begin{longtable}{p{0.24\linewidth}p{0.70\linewidth}}
 \texttt{data.js} & Engine constants mirrored client-side: inventory,
-suggestion table, per-language examples, keyboard map, demo lexicons,
-polar targets. \\
-\texttt{demo-engine.js} & Offline simulation: \texttt{demoG2P},
-\texttt{demoTimeline}, \texttt{demoF0}, \texttt{demoAudio} (formant-tone
-synthesis + WAV encoding), \texttt{demoCompile},
-\texttt{demoSegmentPayload}, \texttt{demoSynthesize}. \\
+suggestion table, per-language examples, keyboard map. \\
 \texttt{render.js} & DOM renderers: token strips, guard banner,
 progress, result summary, downloads, examples, history; \texttt{\$},
 \texttt{\$\$}, \texttt{el}, \texttt{toast}, \texttt{log}. \\
-\texttt{api.js} & Transport (\texttt{jfetch} with 30\,s abort), the
-\texttt{api} facade, client-side caches, demo$\rightarrow$live cache
-clearing (\texttt{clearDemoCaches}), \texttt{normalizePolar}. \\
+\texttt{api.js} & Transport (\texttt{jfetch} with 30\,s abort,
+multi-origin probe), the \texttt{api} facade, client-side caches
+(cleared when the bridge re-engages), \texttt{normalizePolar},
+\texttt{getApiBase}. \\
 \texttt{polar.js} & \texttt{PolarStage}: the continuous display ---
 layered canvases, dual clocks, anchor stepping. Drawing policy
 (journey-centric): exactly ONE journey is displayed --- the anchor pair
@@ -344,7 +346,6 @@ audio.
 
 Client side, \texttt{api.js} keeps mirrors for instant UI replay;
 \texttt{clearDemoCaches()} wipes them when the probe flips
-demo$\rightarrow$live so simulated results never leak into live mode.
 
 \section{Front-end state machine and WYSIWYG paths}
 
@@ -360,7 +361,6 @@ synthesis blocked. \\
 renders. \\
 \texttt{ready} & job done, artifacts available. \\
 \texttt{playing} & playback in progress. \\
-\texttt{backend-offline} & probe failing; demo fallback offered. \\
 \end{longtable}
 
 A v3 rule: \emph{late preview responses can never downgrade a running

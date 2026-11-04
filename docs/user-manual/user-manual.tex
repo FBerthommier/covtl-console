@@ -56,8 +56,7 @@ use a web browser and a media player, you can drive it.
 \section{Installing}
 
 The console is a local web page served by a small Python bridge. Full
-per-system instructions (Windows, macOS, Linux, and the no-Python demo
-mode) live in the repository's \texttt{README.md}. \textbf{Flash
+per-system instructions (Windows, macOS, Linux) live in the repository's \texttt{README.md}. \textbf{Flash
 route} (Python~3.9+): \texttt{pip install
 git+https://github.com/FBerthommier/covtl-console.git} then run
 \texttt{covtl-console} --- the engine (with its VocalTractLab
@@ -78,11 +77,12 @@ a locked-down machine, clone the repository and run
 \end{enumerate}
 
 The header's \emph{backend chip} must read \textbf{live}. If it reads
-\emph{demo}, the engine was not importable and the console is simulating
+\emph{offline}, the bridge is not running yet --- start it with
+\texttt{python -m covtl\_console} and the console engages automatically
 --- fine for exploring the interface, not for research.
 
 No Python at all? Double-click \texttt{covtl-console-standalone.html}:
-the whole console runs from that single file in demo mode, and it goes
+the whole console runs from that single file, and it connects
 live automatically whenever a bridge is reachable on port 8421.
 
 \section{First sounds in five minutes}
@@ -102,7 +102,7 @@ enriched string, and the final SAMPA the engine will receive --- guard
 checked, nothing synthesized yet.}
 \label{fig:preview}
 \end{figure}
-\item \textbf{Press \key{S}} (or click \emph{Synthesize from preview}).
+\item \textbf{Press \key{S}} (or click \emph{Synthesize the framed source}).
   A progress strip runs G2P $\rightarrow$ trajectory $\rightarrow$ VTL
   $\rightarrow$ WAV; a few seconds later the result summary appears
   (\emph{2.37\,s audio, 11 anchors, \ldots}).
@@ -167,7 +167,7 @@ Three separators matter, and the engine treats them differently:
 \end{itemize}
 
 The per-language chips (EN, FR, ES, DE, IT, PT, plus two phonetic
-presets and a guard demo) fill the input and trigger a preview
+presets and a guard exercise) fill the input and trigger a preview
 immediately --- the fastest way to hear each language's calibration.
 
 \section{The red-reject guard}
@@ -206,7 +206,7 @@ The banner offers one-click \emph{suggestions} (\texttt{c $\rightarrow$ k
 \emph{strip} action that
 removes all red symbols at once. You can also hand-edit the final string:
 \emph{Edit SAMPA} opens an editor on the final row; the \emph{edited}
-badge reminds you the string is yours, and \key{E} synthesizes exactly
+badge reminds you the string is yours, and \key{S} synthesizes exactly
 that edited string.
 
 \section{Reading the continuous polar display}
@@ -486,7 +486,7 @@ focus. \\
 \key{Space}/\key{K} & play / pause & \key{[} / \key{]} & prev / next anchor \\
 \key{Shift+S} & stop (to start) & \key{L} & loop current block \\
 \key{P} & preview (no sound) & \key{0}--\key{3} & speed 0.25/0.5/1/2$\times$ \\
-\key{S} & synthesize current & \key{E} & synthesize edited SAMPA \\
+\key{S} & synthesize the framed source & \key{R} & reset the input \\
 \key{C} & focus compiler & \key{D} & downloads menu \\
 \key{R} & reset the input (panes, chain, compiler, results) & \key{Esc} & cancel / stop \\
 \key{?} & shortcut help & & \\
@@ -506,15 +506,17 @@ the terminal anchor --- the display follows the engine's own list, by
 design.
 
 \textbf{What exactly does Synthesize use?} The string shown in the final
-SAMPA row --- the previewed one (\key{S}), your edited one (\key{E}), or
+SAMPA row --- whichever source the blue frame shows ---
 the compiler's output when you pushed it to the stage. What you see is
 what you hear.
 
 \textbf{Where are my files?} In \texttt{out/} under the console folder;
 the Display \& Exports group prints the absolute path.
 
-\textbf{Can I trust the demo mode?} For the interface and guard
-semantics, yes --- they are the real code paths. The G2P, compiler and
-audio are \emph{approximate simulations}, labeled as demo everywhere.
+\textbf{Is there an offline mode?} No --- and deliberately so.
+Preview, compile and synthesis are engine calls served by the Python
+bridge; without it the console stays in an explicit offline state and
+engages automatically as soon as the bridge answers. Nothing is
+simulated.
 
 \end{document}
