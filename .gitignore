@@ -5,6 +5,7 @@ server_run.log
 __pycache__/
 *.pyc
 .pytest_cache/
+dist/
 
 # Synthesis / video artifacts
 *.wav

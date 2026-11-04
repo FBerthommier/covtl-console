@@ -54,6 +54,28 @@ jobs:
       - name: Run the slow lane
         run: python -m pytest tests/ -v -m slow
 
+  flash:
+    name: flash install e2e (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Flash install end-to-end (wheel, scratch venv, live chain)
+        run: python tests/flash_e2e.py
+      - name: Upload the flash e2e log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flash-e2e-log-${{ matrix.os }}
+          path: flash_e2e.log
+
   standalone:
     name: standalone bundle
     runs-on: ubuntu-latest
