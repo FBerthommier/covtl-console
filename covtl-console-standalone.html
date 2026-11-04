@@ -3901,7 +3901,10 @@ function resetInputs() {
   $('#result-summary').innerHTML = '';
   $('#job-strip').style.display = 'none';
   $('#seg-badge').style.display = 'none';
+  // the downloads menu is EMPTIED, not just hidden — re-opening `D`
+  // must show the no-artifacts state, never the previous job's entries
   $('#dl-menu').style.display = 'none';
+  R.renderDownloads($('#dl-menu'), [], {});
   buildScrubTicks();
   $('#polar-block').textContent = '—';
   $('#polar-anchor').textContent = '—';
