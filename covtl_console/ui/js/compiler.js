@@ -55,7 +55,7 @@ const KIND_TIP = {
  * plateaus in engine order, '‿' marking a consonant group that follows a
  * vowel inside the same stretch (coda of the previous syllable fused with
  * the next onset — that is the engine's coarticulation, not a syllable) */
-export function stretchLabel(blocks) {
+export function stretchLabel(blocks, labelTo) {
   let out = '';
   let sawVowel = false;
   for (const b of blocks || []) {
@@ -63,7 +63,12 @@ export function stretchLabel(blocks) {
     else if (b.kind === 'cluster' && b.cons_keys && b.cons_keys.length) {
       out += (sawVowel ? '‿' : '') + b.cons_keys.join('');
     }
-    else if (b.kind === 'background') out += (b.hiatus || '-');
+    else if (b.kind === 'background') {
+      // V1V2 arc — no plateau: the arrival vowel names it (hiatus label
+      // from the sandhi layer when present)
+      out += '‿' + (b.hiatus || labelTo || '');
+      sawVowel = true;
+    }
     else if (b.breath) out += '%';
     else if (b.kind === 'pause') out += (b.long ? '|' : '␣');
     else if (b.kind === 'decay' || b.kind === 'attack') out += '·';
@@ -387,7 +392,7 @@ export class SyllableCompiler {
       onclick: () => this.selectSegment(s.segment_index),
       onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.selectSegment(s.segment_index); } },
     });
-    const stretch = s.stretch || stretchLabel(s.blocks) || s.label;
+    const stretch = s.stretch || stretchLabel(s.blocks, s.label_to) || s.label;
     card.append(
       el('div', { class: 'card-head' },
         el('span', { class: 'card-idx mono', text: `S${s.segment_index}` }),

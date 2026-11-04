@@ -169,8 +169,7 @@ function buildHelp() {
       row('L', 'Loop the current block'),
       row('0 / 1 / 2 / 3', 'Speed 0.25× / 0.5× / 1× / 2×'),
       row('P', 'Preview the engine\'s input (G2P + enrichment + guard — never makes sound)'),
-      row('S', 'Synthesize from the current source'),
-      row('E', 'Synthesize from the edited SAMPA'),
+      row('S', 'Synthesize the framed source (main input / edited SAMPA / compiler blocks)'),
       row('C', 'Focus the syllable compiler (Enter compiles)'),
       row('D', 'Downloads menu'),
       row('R', 'Reset the input — clears both panes, the preview chain, the compiler panel and the synthesis results (a running synthesis is cancelled)'),
@@ -410,7 +409,6 @@ function bindControls() {
   // action bar
   $('#btn-preview').addEventListener('click', () => convert());
   $('#btn-synth').addEventListener('click', () => synthesize('auto'));
-  $('#btn-synth-edit').addEventListener('click', () => synthesize('edited'));
   $('#btn-cancel').addEventListener('click', cancelSynthesis);
 
   // spectrogram toolbar
@@ -531,48 +529,33 @@ function updateOutResolved() {
 
 function updateSynthButtons() {
   updateSourceFrame();
+  const btn = $('#btn-synth');
   if (api.mode !== 'live') {
-    const btn = $('#btn-synth');
     btn.disabled = true;
     btn.textContent = 'Synthesize — bridge offline';
-    $('#btn-synth-edit').disabled = true;
-    $('#btn-preview').disabled = api.mode !== 'live';
     return;
   }
   const rej = state.sampaRejected.length;
   const hasPhonetic = state.sampaTokens.some((t) => t.kind === 'vowel' || t.kind === 'consonant');
-  const btn = $('#btn-synth');
-  const btnE = $('#btn-synth-edit');
-  const editedDiffers = state.editedSampa !== null
-    && state.editedSampa !== (state.preview ? state.preview.final : null);
   if (state.job.running) {
     btn.disabled = true;
     btn.textContent = '⏳ Synthesizing…';
-    btnE.disabled = true;
   } else if (state.previewBusy) {
-    // coordination: a preview in flight must complete before synthesis —
-    // the synthesized string is the preview/compile output
     btn.disabled = true;
     btn.textContent = '⏳ Synthesize — preview in flight…';
-    btnE.disabled = true;
   } else if (!hasPhonetic) {
     btn.disabled = true;
     btn.textContent = 'Synthesize — the framed source has no vowels or consonants';
-    btnE.disabled = true;
   } else if (state.guardPolicy === 'error' && rej > 0) {
     btn.disabled = true;
     btn.textContent = `Synthesize — blocked by guard (${rej} red)`;
-    btnE.disabled = true;
   } else if (state.guardPolicy === 'warn' && rej > 0) {
     btn.disabled = false;
     btn.textContent = `Synthesize anyway (${rej} symbol${rej > 1 ? 's' : ''} dropped)`;
-    btnE.disabled = !editedDiffers;
   } else {
     btn.disabled = false;
-    btn.textContent = 'Synthesize from preview';
-    btnE.disabled = !editedDiffers;
+    btn.textContent = 'Synthesize the framed source';
   }
-  btnE.title = editedDiffers ? 'Use the edited final SAMPA (use_g2p=False)' : 'Enabled when the final SAMPA row is edited';
 }
 
 const PREVIEW_STATES = new Set(['empty', 'preview-ready', 'guard-warn', 'guard-error', 'backend-offline']);
@@ -978,8 +961,8 @@ async function synthesize(source) {
   $('#btn-cancel').style.display = '';
   setAppState('synthesizing');
   updateSynthButtons();
-  $('#polar-status').textContent = `job starting… ${source === 'edited' ? '(from edited SAMPA)' : ''}`;
-  R.log(`synthesize ${source === 'edited' ? 'from edited SAMPA (use_g2p=False)' : 'from current source'} · guard=${state.guardPolicy}`);
+  $('#polar-status').textContent = 'job starting…';
+  R.log(`synthesize from the framed source · guard=${state.guardPolicy}`);
   try {
     const result = await api.synthesize(payload, {
       onStage: (stage, st, progress) => R.renderProgress({ stage, state: st, progress, polarReady: polarStage?.hasData(), wavReady: false }),
@@ -1153,7 +1136,7 @@ function flashSegment(idx) {
 /* phonetic unit label of an anchor→anchor segment: chronological stretch
  * (clusters and plateaus in engine order, ‿ = coda fused with next onset) */
 function unitLabel(seg) {
-  return stretchLabel(seg.blocks || []);
+  return stretchLabel(seg.blocks || [], seg.labelTo);
 }
 
 function onPolarTick(tick) {
@@ -1321,7 +1304,6 @@ function bindShortcuts() {
       case ' ': case 'k': case 'K': e.preventDefault(); togglePlay(); break;
       case 'S': if (e.shiftKey) { e.preventDefault(); stopPlayback(); } break;
       case 's': e.preventDefault(); synthesize('auto'); break;
-      case 'e': case 'E': e.preventDefault(); synthesize('edited'); break;
       case 'p': case 'P': e.preventDefault(); convert(); break;
       case 'c': case 'C': e.preventDefault(); $('#compiler-input')?.focus(); break;
       case 'l': case 'L': $('#btn-loop').click(); break;
