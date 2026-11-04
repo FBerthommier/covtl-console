@@ -1,0 +1,181 @@
+# SPDX-FileCopyrightText: 2026 Frédéric Berthommier
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# TestPyPI publication — MANUAL ONLY (workflow_dispatch; no push tag, no
+# release event) so nothing accidental ever ships while the publication
+# posture is being validated. ci.yml stays untouched.
+#
+# What it does, in strict dependency order in ONE job (sequential steps,
+# order guaranteed): stamp a PEP 440 test version (upstream + "." + suffix,
+# e.g. 3.1.0 -> 3.1.0.dev1 — TestPyPI forbids re-uploading a version, the
+# dev suffix avoids collisions; re-run with a fresh suffix instead of
+# overwriting), build, publish covtl-sandhi, then vtl-synth, then
+# covtl-console, then install each back from TestPyPI (smoke check).
+#
+# Dependencies: TestPyPI holds NO production dependency, so every pip
+# install that may resolve deps carries --extra-index-url
+# https://pypi.org/simple/ (real PyPI) alongside the TestPyPI index.
+#
+# Known limitation of the smoke check: the console wheel still pins its
+# engine/sandhi dependencies as git+ URLs, so installing it from TestPyPI
+# resolves those from GitHub (the proven flash-install path), NOT from
+# TestPyPI — flipping the pins to registry names is the post-publication
+# step (docs/flash-validation-report.md, residual risk 2). The upstream
+# wheels themselves ARE installed from TestPyPI (separate venv).
+#
+# Trusted publishing: the maintainer's pending publishers on TestPyPI
+# point at this repository + workflow (publish.yml) + environment
+# (testpypi) — the OIDC id-token below is what they authenticate.
+name: publish (TestPyPI)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_suffix:
+        description: "PEP 440 dev segment appended to every package version (empty = dev<run number>)"
+        required: false
+        default: "dev1"
+      sandhi_ref:
+        description: "covtl-sandhi ref to publish"
+        required: false
+        default: "main"
+      pipeline_ref:
+        description: "covtl-pipeline (vtl-synth) ref to publish"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+jobs:
+  testpypi:
+    name: build + publish (sequential, dependency order)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/covtl-console
+    permissions:
+      contents: read
+      id-token: write        # OIDC — trusted publishing on TestPyPI
+    steps:
+      - name: Checkout covtl-console (this repository)
+        uses: actions/checkout@v4
+
+      - name: Checkout the upstream packages
+        uses: actions/checkout@v4
+        with:
+          repository: FBerthommier/covtl-sandhi
+          ref: ${{ inputs.sandhi_ref }}
+          path: _upstream/covtl-sandhi
+
+      - name: Checkout covtl-pipeline (vtl-synth)
+        uses: actions/checkout@v4
+        with:
+          repository: FBerthommier/covtl-pipeline
+          ref: ${{ inputs.pipeline_ref }}
+          path: _upstream/covtl-pipeline
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling (real PyPI carries the deps, TestPyPI does not)
+        run: |
+          python -m pip install --extra-index-url https://pypi.org/simple/ \
+            build packaging
+
+      - name: Stamp the test versions (upstream + .devN)
+        env:
+          VERSION_SUFFIX: ${{ inputs.version_suffix }}
+        run: |
+          python - <<'EOF'
+          import os, re, sys
+          suffix = os.environ.get("VERSION_SUFFIX", "").strip() \
+              or f"dev{os.environ['GITHUB_RUN_NUMBER']}"
+          genv = os.environ.get("GITHUB_ENV")
+          pkgs = [
+              ("_upstream/covtl-sandhi/pyproject.toml", "covtl-sandhi", "SANDHI_VERSION"),
+              ("_upstream/covtl-pipeline/pyproject.toml", "vtl-synth", "VTL_VERSION"),
+              ("pyproject.toml", "covtl-console", "CONSOLE_VERSION"),
+          ]
+          from packaging.version import Version
+          for path, name, var in pkgs:
+              src = open(path, encoding="utf-8").read()
+              m = re.search(r'(?m)^version\s*=\s*"([^"]+)"$', src)
+              if not m:
+                  sys.exit(f"static version line not found in {path}")
+              stamped = Version(f"{m.group(1)}.{suffix}")
+              out = src[:m.start(1)] + str(stamped) + src[m.end(1):]
+              open(path, "w", encoding="utf-8", newline="\n").write(out)
+              with open(genv, "a", encoding="utf-8") as f:
+                  f.write(f"{var}={stamped}\n")
+              print(f"{name}: {m.group(1)} -> {stamped}")
+          EOF
+
+      # ── 1/3 — covtl-sandhi ─────────────────────────────────────────
+      - name: Build covtl-sandhi
+        run: python -m build --outdir dist/covtl-sandhi _upstream/covtl-sandhi
+
+      - name: Publish covtl-sandhi to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/covtl-sandhi
+
+      # ── 2/3 — vtl-synth (needs nothing from TestPyPI; deps from real PyPI)
+      - name: Build vtl-synth
+        run: python -m build --outdir dist/vtl-synth _upstream/covtl-pipeline
+
+      - name: Publish vtl-synth to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/vtl-synth
+
+      # ── 3/3 — covtl-console ────────────────────────────────────────
+      - name: Build covtl-console
+        run: python -m build --outdir dist/covtl-console .
+
+      - name: Publish covtl-console to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/covtl-console
+
+      # ── smoke — install every artifact back from TestPyPI ─────────
+      - name: Smoke check — upstream wheels from TestPyPI
+        run: |
+          python -m venv /tmp/smoke-upstream
+          /tmp/smoke-upstream/bin/pip install \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            "covtl-sandhi==${SANDHI_VERSION}" "vtl-synth==${VTL_VERSION}"
+          /tmp/smoke-upstream/bin/python - <<'EOF'
+          import importlib.metadata as md
+          assert md.version("covtl-sandhi") == __import__("os").environ["SANDHI_VERSION"]
+          assert md.version("vtl-synth") == __import__("os").environ["VTL_VERSION"]
+          import covtl_sandhi, vtl_synth
+          print("upstream wheels import cleanly from TestPyPI")
+          EOF
+
+      - name: Smoke check — console wheel from TestPyPI (git+ deps)
+        run: |
+          python -m venv /tmp/smoke-console
+          /tmp/smoke-console/bin/pip install \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            "covtl-console==${CONSOLE_VERSION}"
+          /tmp/smoke-console/bin/python -c "
+          import importlib.metadata as md, os
+          assert md.version('covtl-console') == os.environ['CONSOLE_VERSION']
+          import covtl_console
+          print('console wheel imports; __version__ =', covtl_console.__version__)"
+          /tmp/smoke-console/bin/covtl-console --help
+
+      - name: Upload the built distributions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testpypi-distributions
+          path: dist/
