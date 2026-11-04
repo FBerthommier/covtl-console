@@ -561,18 +561,24 @@ def build_segment_payload(job: Dict[str, Any], from_k: int = 0,
         raise HTTPException(404, "polar data not available for this job")
     doc = json.loads(Path(polar_path).read_text(encoding="utf-8"))
     st = job.get("structure") or {}
-    anchors = st.get("anchors") or []
-    blocks = st.get("blocks") or []
+    return _segments_from(doc, st.get("anchors") or [], st.get("blocks") or [],
+                          job_id=job["id"], from_k=from_k, mode=mode)
+
+
+def _segments_from(polar_doc: Dict[str, Any], anchors: List[Dict[str, Any]],
+                   blocks: List[Dict[str, Any]], job_id: str = "",
+                   from_k: int = 0, mode: str = "inc") -> Dict[str, Any]:
+    """Data-level segment payload from a .polar-shaped doc + structure."""
     if not anchors:
         raise HTTPException(404, "anchor structure not recorded for this job")
 
-    traj = doc.get("trajectory") or {}
+    traj = polar_doc.get("trajectory") or {}
     vr = traj.get("vocalic", {}).get("rho", [])
     vt = traj.get("vocalic", {}).get("theta", [])
     cr = traj.get("consonantal", {}).get("rho", [])
     ct = traj.get("consonantal", {}).get("theta", [])
-    n_steps = doc.get("n_steps") or len(vr)
-    rho_max = _rho_max_of(doc)
+    n_steps = polar_doc.get("n_steps") or len(vr)
+    rho_max = _rho_max_of(polar_doc)
 
     def pt_row(i: int) -> Dict[str, Any]:
         row: Dict[str, Any] = {"t": round(i / 100.0, 3)}
@@ -618,7 +624,7 @@ def build_segment_payload(job: Dict[str, Any], from_k: int = 0,
     else:
         anchors_out = anchors[max(0, from_k):max(0, from_k) + len(segs_out) + 1]
     return {
-        "job_id": job["id"],
+        "job_id": job_id,
         "segment_count": max(0, len(anchors) - 1),
         "from": max(0, from_k),
         "rho_max": round(rho_max, 3),
@@ -1193,6 +1199,9 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
                 out_s += "%"
             elif b["kind"] == "pause":
                 out_s += ("|" if b["long"] else "␣")
+            elif b["kind"] == "background":
+                # V1V2 arc — no plateau: label with the arrival vowel
+                out_s += "‿" + (a1["label"] or "")
             elif b["kind"] in ("decay", "attack"):
                 out_s += "·"
             elif b["kind"] == "initial" and not out_s:
@@ -1201,9 +1210,39 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
                 out_s += "◂"
         labeled.append({"segment_index": k, "t0": a0["t"], "t1": a1["t"],
                         "label": label, "stretch": out_s or "-",
-                        "cons": cons, "vowel": vowel,
+                        "label_to": a1["label"], "cons": cons, "vowel": vowel,
                         "kinds": [b["kind"] for b in span],
                         "n_steps": int(round((a1["t"] - a0["t"]) * 100))})
+
+    # polar trajectories — the full symbolic output of syltraj (no audio):
+    # the same engine functions the synthesis polar stage uses, so Compile
+    # can populate the continuous display without any VTL run.
+    polar_payload = None
+    try:
+        t = _timings_of(req.lang, req.timings)
+        from vtl_synth.video.polar_video import build_polar, _jfloats
+        from vtl_synth.core.continuous import _normalize_ipa
+        from vtl_synth.core.syltraj import _normalize_word
+        tc = max(1, round(t["tcons"] / 10.0))
+        tv = max(1, round(t["tvoy"] / 10.0))
+        phrases = [_normalize_ipa(_normalize_word(ph)) for ph in _phrases_of(src)]
+        polar_data = build_polar(phrases, t_cons=tc, t_voy=tv,
+                                 pause_short_ms=t["tpause"],
+                                 pause_long_ms=t["tpauseLong"])
+        doc = {
+            "n_steps": polar_data["n_steps"],
+            "inventory": polar_data["inventory"],
+            "trajectory": {
+                "vocalic": {"rho": polar_data["traj_v"][:, 0].tolist(),
+                            "theta": polar_data["traj_v"][:, 1].tolist()},
+                "consonantal": {"rho": _jfloats(polar_data["traj_c"][:, 0]),
+                                "theta": _jfloats(polar_data["traj_c"][:, 1])},
+            },
+        }
+        polar_payload = _segments_from(doc, st["anchors"], st["blocks"],
+                                       job_id="compile", from_k=0, mode="full")
+    except Exception as exc:
+        warnings.append(f"polar trajectories unavailable: {exc}")
 
     out = {
         "source": src,
@@ -1213,6 +1252,7 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
         "nodes": st["nodes"],
         "metrics": st["metrics"],
         "segments_preview": labeled,
+        "polar": polar_payload,
         "targets": targets,
         "rejected_symbols": rejected,
         "warnings": warnings,
