@@ -426,8 +426,29 @@ def _instrumented_phrase_build(phrase: str, t_cons: int, t_voy: int,
             return "%" if a.breath else ("|" if a.long else "␣")
         return "▸" if a.i < 0 else "◂"
 
+    def _mute_label(a) -> str:
+        """Muted anchor label: key of the vowel whose point this anchor's
+        pt derives from (theta match, nearest node index), suffixed '*'.
+        '*' alone when no vowel node matches."""
+        best, best_d = None, None
+        if a.pt:
+            for i, n in enumerate(nodes):
+                if n.kind != "V":
+                    continue
+                d_theta = abs(float(n.theta) - float(a.pt[1]))
+                d_idx = abs(i - a.i)
+                if best_d is None or (d_theta, d_idx) < best_d:
+                    best, best_d = n, (d_theta, d_idx)
+            if best is not None:
+                return str(best.key) + "*"
+        return "*"
+
     out_anchors = [
-        {"i": k, "t": anchor_t[k] / 100.0, "kind": a.kind, "label": _node_key(a),
+        {"i": k, "t": anchor_t[k] / 100.0, "kind": a.kind,
+         "label": _mute_label(a) if (a.is_vowel_onset or a.is_word_end)
+                  else _node_key(a),
+         "mute": bool(a.is_vowel_onset or a.is_word_end),
+         "syl_onset": bool(a.is_syl_vowel_onset),
          "long": bool(a.long), "breath": bool(a.breath),
          "hold": bool(a.hold), "word_end": bool(a.is_word_end),
          "pt": ([float(a.pt[0]), float(a.pt[1])] if a.pt else None)}
@@ -552,6 +573,24 @@ def _rho_max_of(polar_doc: Dict[str, Any]) -> float:
     return m
 
 
+def segment_notation(a0: Dict[str, Any], a1: Dict[str, Any],
+                     span_blocks: List[Dict[str, Any]]) -> str:
+    """Tile notation for ONE anchor-to-anchor segment:
+    FROM · CONSONANTS · TO (no consonants: FROM·TO).
+
+    FROM / TO are the bounding anchor labels --- a real vowel keeps its key,
+    a muted anchor carries the key of the vowel its point derives from plus
+    '*' (e.g. "i*"); pauses and terminals keep "␣" "|" "%" "▸" "◂".
+    CONSONANTS is the concatenated cons_keys of the cluster blocks strictly
+    inside the interval. '·' is a field separator, NOT an anchor: "i·b·a" is
+    a single segment i → a whose interior consonant block is b."""
+    frm = a0.get("label") or "*"
+    to = a1.get("label") or "*"
+    cons = "".join(ck for b in span_blocks if b.get("kind") == "cluster"
+                   for ck in (b.get("cons_keys") or []))
+    return "·".join(x for x in (frm, cons, to) if x)
+
+
 def build_segment_payload(job: Dict[str, Any], from_k: int = 0,
                           mode: str = "inc") -> Dict[str, Any]:
     """Merge the recorded structure (anchors/blocks) with the .polar
@@ -612,6 +651,7 @@ def _segments_from(polar_doc: Dict[str, Any], anchors: List[Dict[str, Any]],
             "segment_index": k, "t0": round(a0["t"], 3), "t1": round(a1["t"], 3),
             "anchor_from": a0["i"], "anchor_to": a1["i"],
             "label_from": a0["label"], "label_to": a1["label"],
+            "notation": segment_notation(a0, a1, span_blocks),
             "blocks": [{kk: b.get(kk) for kk in ("kind", "n_steps", "cons_keys",
                                                  "vowel_key", "long", "breath",
                                                  "hiatus", "t0", "t1")}
@@ -1182,34 +1222,11 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
         hiatus = next((b["hiatus"] for b in span if b.get("hiatus")), "")
         label = ("".join(cons) + (vowel or "")) or hiatus or a0["label"] \
             or a1["label"] or "-"
-        # chronological stretch string: engine order, '‿' marks consonants
-        # following a vowel inside the same stretch (coda fused with the
-        # next onset — coarticulation, not a syllable boundary)
-        out_s: str = ""
-        saw_vowel = False
-        for b in span:
-            if b["kind"] == "plateau":
-                out_s += (b["vowel_key"] or "@")
-                saw_vowel = True
-            elif b["kind"] == "cluster" and b["cons_keys"]:
-                out_s += ("‿" if saw_vowel else "") + "".join(b["cons_keys"])
-            elif b["kind"] == "background":
-                out_s += b.get("hiatus") or "-"
-            elif b["breath"]:
-                out_s += "%"
-            elif b["kind"] == "pause":
-                out_s += ("|" if b["long"] else "␣")
-            elif b["kind"] == "background":
-                # V1V2 arc — no plateau: label with the arrival vowel
-                out_s += "‿" + (a1["label"] or "")
-            elif b["kind"] in ("decay", "attack"):
-                out_s += "·"
-            elif b["kind"] == "initial" and not out_s:
-                out_s += "▸"
-            elif b["kind"] == "terminal":
-                out_s += "◂"
+        # tile notation (single definition, _segments_from shares it):
+        # FROM · CONSONANTS · TO for one anchor-to-anchor segment
+        notation = segment_notation(a0, a1, span)
         labeled.append({"segment_index": k, "t0": a0["t"], "t1": a1["t"],
-                        "label": label, "stretch": out_s or "-",
+                        "label": label, "notation": notation,
                         "label_to": a1["label"], "cons": cons, "vowel": vowel,
                         "kinds": [b["kind"] for b in span],
                         "n_steps": int(round((a1["t"] - a0["t"]) * 100))})

@@ -51,10 +51,10 @@ const KIND_TIP = {
   terminal: 'phrase-terminal arc → neutral',
 };
 
-/* chronological phoneme string of an anchor→anchor stretch: clusters and
- * plateaus in engine order, '‿' marking a consonant group that follows a
- * vowel inside the same stretch (coda of the previous syllable fused with
- * the next onset — that is the engine's coarticulation, not a syllable) */
+/* (stretchLabel removed — the tile notation is defined once, server-side:
+ * segment_notation() in server.py, exported as segments[].notation and
+ * segments_preview[].notation. Grammar: FROM·CONSONANTS·TO; '*' marks a
+ * muted anchor.) */
 export const degDisplay = (rad) => ((90 - rad * 180 / Math.PI) % 360 + 360) % 360;
 
 export class SyllableCompiler {

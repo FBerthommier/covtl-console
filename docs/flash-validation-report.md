@@ -3,6 +3,8 @@
 
 # Flash-install validation campaign — report (2026-11-04)
 
+> **Update 2026-11-04 (tile notation refactor):** the stretch labels shown below with the `‿` coarticulation marker have been replaced by the unambiguous tile notation `FROM·CONSONANTS·TO` (muted anchors carry `*`; `·` is a field separator, not an anchor). See `CHANGES_v3.md` in the console repository.
+
 Everything needed to decide the PyPI publication of `covtl-sandhi`,
 `vtl-synth` and `covtl-console`. **The publication itself is out of
 scope**; TestPyPI dry runs were not exercised either (no account step

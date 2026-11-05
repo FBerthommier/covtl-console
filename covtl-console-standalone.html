@@ -2826,10 +2826,10 @@ const KIND_TIP = {
   terminal: 'phrase-terminal arc → neutral',
 };
 
-/* chronological phoneme string of an anchor→anchor stretch: clusters and
- * plateaus in engine order, '‿' marking a consonant group that follows a
- * vowel inside the same stretch (coda of the previous syllable fused with
- * the next onset — that is the engine's coarticulation, not a syllable) */
+/* (stretchLabel removed — the tile notation is defined once, server-side:
+ * segment_notation() in server.py, exported as segments[].notation and
+ * segments_preview[].notation. Grammar: FROM·CONSONANTS·TO; '*' marks a
+ * muted anchor.) */
 const degDisplay = (rad) => ((90 - rad * 180 / Math.PI) % 360 + 360) % 360;
 
 class SyllableCompiler {
@@ -4410,8 +4410,8 @@ function flashSegment(idx) {
   compiler?.markPlayingSegment(idx);
 }
 
-/* phonetic unit label of an anchor→anchor segment: chronological stretch
- * (clusters and plateaus in engine order, ‿ = coda fused with next onset) */
+/* phonetic unit label of an anchor→anchor segment: the shared tile
+ * notation FROM·CONSONANTS·TO (server-side single definition) */
 function unitLabel(seg) {
   return seg.notation || '·';
 }

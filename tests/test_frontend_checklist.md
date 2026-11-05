@@ -93,7 +93,7 @@ must read **live**.
       the old response is dropped when it lands (no flicker of stale data).
 - [ ] Metric tiles (syllables · anchors · blocks · C/V · duration) match
       the engine metrics for the worked example (6 · 11 · 16 · … · 2.38 s).
-- [ ] Stretch labels are chronological and coda stretches carry the `‿`
+- [ ] Tiles are chronological and read from·consonants·to (`*` = muted anchor)
       coarticulation marker (e.g. in `Dis.iz.i.zi.fOR.@s`).
 - [ ] Block cards are clickable; “use in phonetic input” pushes the string
       to the stage.

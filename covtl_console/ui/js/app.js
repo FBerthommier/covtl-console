@@ -1154,8 +1154,8 @@ function flashSegment(idx) {
   compiler?.markPlayingSegment(idx);
 }
 
-/* phonetic unit label of an anchor→anchor segment: chronological stretch
- * (clusters and plateaus in engine order, ‿ = coda fused with next onset) */
+/* phonetic unit label of an anchor→anchor segment: the shared tile
+ * notation FROM·CONSONANTS·TO (server-side single definition) */
 function unitLabel(seg) {
   return seg.notation || '·';
 }
