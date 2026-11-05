@@ -121,11 +121,11 @@ def test_compile_metrics_and_stretches(client):
     m = body["metrics"]
     assert m["anchors"] == 11
     assert m["anchors"] == m["segments"] + 1
-    stretches = [s["stretch"] for s in body["segments_preview"]]
-    assert any("‿" in s for s in stretches), \
-        "coda stretches must carry the ‿ coarticulation marker"
+    notations = [s["notation"] for s in body["segments_preview"]]
+    assert notations == ['▸·i*', 'i*·D·i', 'i·s·i', 'i·z·i', 'i·z·i',
+                         'i·f·O', 'O·R·@', '@·s·@*', '@*·␣', '␣·◂'], notations
     times = [(s["t0"], s["t1"]) for s in body["segments_preview"]]
-    assert times == sorted(times), "stretch labels must be chronological"
+    assert times == sorted(times), "tile labels must be chronological"
     assert body["targets"], "per-phoneme polar targets expected"
 
 
@@ -161,8 +161,11 @@ def test_compile_labels_nasal_hiatus(client):
     assert backgrounds, "the hiatus background arc is expected in the plan"
     hiatus = [b.get("hiatus") for b in backgrounds if b.get("hiatus")]
     assert hiatus and any("a~" in h for h in hiatus), blocks
-    stretches = [s["stretch"] for s in r.json()["segments_preview"]]
-    assert any("a~" in s for s in stretches), stretches
+    notations = [s["notation"] for s in r.json()["segments_preview"]]
+    # the plan keeps ORAL bases: the a~→a hiatus tile reads 'a·a' (the '~'
+    # lives in the audio VO gate, not in the notation); the hiatus label
+    # itself stays on the background block (asserted above)
+    assert 'a·a' in notations, notations
 
 
 @requires_engine
@@ -178,8 +181,9 @@ def test_compile_labels_merged_nasal_hiatus(client):
     hiatus = [b.get("hiatus") for b in blocks
               if b["kind"] == "background" and b.get("hiatus")]
     assert hiatus == ["a~.a~"], blocks
-    stretches = [s["stretch"] for s in r.json()["segments_preview"]]
-    assert "a~.a~" in stretches, stretches
+    notations = [s["notation"] for s in r.json()["segments_preview"]]
+    # merged hiatus tile: background a~.a~→a reads 'a·a' (oral bases)
+    assert 'a·a' in notations, notations
 
 
 @requires_engine

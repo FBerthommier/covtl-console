@@ -19,7 +19,7 @@ import {
 } from './data.js';
 import { PolarStage } from './polar.js';
 import { SpectrogramView } from './spectrogram.js';
-import { SyllableCompiler, stretchLabel } from './compiler.js';
+import { SyllableCompiler } from './compiler.js';
 
 const SETTINGS_KEY = 'covtl.settings.v3';
 const HISTORY_KEY = 'covtl.history.v1';      // preserved from v2
@@ -1157,7 +1157,7 @@ function flashSegment(idx) {
 /* phonetic unit label of an anchor→anchor segment: chronological stretch
  * (clusters and plateaus in engine order, ‿ = coda fused with next onset) */
 function unitLabel(seg) {
-  return stretchLabel(seg.blocks || [], seg.labelTo);
+  return seg.notation || '·';
 }
 
 function onPolarTick(tick) {

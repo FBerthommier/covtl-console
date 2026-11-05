@@ -37,6 +37,7 @@ must read **live**.
 - [ ] Preview button shows feedback: label becomes `⏳ Previewing…` and the
       in-flight pill reads `⏳ n in flight…` while the request runs.
 - [ ] Example chips (EN/FR/ES/DE/IT/PT + phonetic + guard demo) fill the
+- [ ] Tiles and the spectrogram band show the SAME notation (from·consonants·to; * = muted anchor).
       input and preview immediately.
 - [ ] Orthographic text produces the three-line preview stack: G2P →
       enriched → final SAMPA (worked example `this is easy for us` →

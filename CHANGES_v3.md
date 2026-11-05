@@ -22,6 +22,51 @@ Deliverables:
 
 ---
 
+
+## Notation refactor — FROM·CONSONANTS·TO (2026-11-04)
+
+### Verified code-level facts
+
+- Tile notation is now defined ONCE, server-side
+  (`segment_notation(a0, a1, span_blocks)` in `covtl_console/server.py`),
+  exported by `/api/compile` (`segments_preview[].notation`) and
+  `/api/job/{id}/polar` (`segments[].notation`); `compiler.js` and
+  `app.js` consume it (`stretchLabel` deleted, the duplicated `out_s`
+  loop in `compile_blocks` deleted — the two definitions had already
+  diverged: VV arcs read "-" in tiles and "‿a" in the spectrogram).
+- Tile grammar: `FROM·CONSONANTS·TO` per anchor→anchor segment
+  ("·" is a field separator, not an anchor); muted anchors
+  (`is_vowel_onset`, `is_word_end`) carry the key of the vowel their
+  point derives from + "*" (new `_mute_label`, theta-match + nearest
+  node index; anchors export `mute` / `syl_onset` flags). "‿" and the
+  decay/attack "·" tokens are gone.
+- Anchors are now contiguous in the notation: every tile's FROM equals
+  the previous tile's TO (tested).
+- Tests: `tests/test_notation.py` (7 tests — expected strings
+  hand-traced and verified against the engine: iba, ib.bi, i.bi, ia;
+  compile/polar notation equality; chain contiguity; no "‿").
+  `test_api.py` stretch assertions rewritten to the notation (the
+  Dis.iz… tile list is asserted verbatim). Suite: 61 passed.
+- Synthesis untouched: syltraj, build_polar, the audio path, timings
+  and caches are not modified by this refactor.
+
+### Interpretive points
+
+- "*" reads as "weighted by COEFCEN" — a muted anchor is a timing
+  joint, not a string vowel; the earlier label (neighboring consonant
+  key, or empty) was ambiguous.
+- Nasal hiatus tiles keep ORAL bases ("a·a"): the "~" is re-injected
+  in the audio VO gate, not in the plan notation; the hiatus label
+  itself stays on the background block.
+
+### Out of scope (listed, not fixed)
+
+- The engine's "pause" block kind is unreachable from the console.
+- The `syllables` metric ignores VV nuclei (background arcs).
+- Per-phoneme polar targets are computed with `theta_ctx=π`.
+- Compile-cache entries are not keyed on the guard policy.
+- `rhoMax` is hardcoded at 1.45 client-side.
+
 ## A. Engine ground truth established first (brief ch. 2)
 
 - `.polar` format v4 verified live: JSON, 100 Hz, `trajectory.vocalic /

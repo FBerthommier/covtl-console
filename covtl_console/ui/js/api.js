@@ -372,6 +372,7 @@ export function normalizePolar(p) {
       index: s.segment_index, t0: s.t0, t1: s.t1,
       anchorFrom: s.anchor_from, anchorTo: s.anchor_to,
       labelFrom: s.label_from, labelTo: s.label_to,
+      notation: s.notation,
       blocks: s.blocks || [], markers: s.markers || null,
       n, t, rv, tv, rc, tc,
     };

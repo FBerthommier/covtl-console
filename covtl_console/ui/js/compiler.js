@@ -55,30 +55,7 @@ const KIND_TIP = {
  * plateaus in engine order, '‿' marking a consonant group that follows a
  * vowel inside the same stretch (coda of the previous syllable fused with
  * the next onset — that is the engine's coarticulation, not a syllable) */
-export function stretchLabel(blocks, labelTo) {
-  let out = '';
-  let sawVowel = false;
-  for (const b of blocks || []) {
-    if (b.kind === 'plateau') { out += (b.vowel_key || '@'); sawVowel = true; }
-    else if (b.kind === 'cluster' && b.cons_keys && b.cons_keys.length) {
-      out += (sawVowel ? '‿' : '') + b.cons_keys.join('');
-    }
-    else if (b.kind === 'background') {
-      // V1V2 arc — no plateau: the arrival vowel names it (hiatus label
-      // from the sandhi layer when present)
-      out += '‿' + (b.hiatus || labelTo || '');
-      sawVowel = true;
-    }
-    else if (b.breath) out += '%';
-    else if (b.kind === 'pause') out += (b.long ? '|' : '␣');
-    else if (b.kind === 'decay' || b.kind === 'attack') out += '·';
-    else if (b.kind === 'initial' && !out) out += '▸';
-    else if (b.kind === 'terminal') out += '◂';
-  }
-  return out || '·';
-}
-
-const degDisplay = (rad) => ((90 - rad * 180 / Math.PI) % 360 + 360) % 360;
+export const degDisplay = (rad) => ((90 - rad * 180 / Math.PI) % 360 + 360) % 360;
 
 export class SyllableCompiler {
   /* opts: { api, getTimings(), getGuardPolicy(), getLang(),
@@ -143,7 +120,7 @@ export class SyllableCompiler {
       el('strong', { text: 'It never synthesizes: ' }),
       'no audio, no job. Use it to inspect or debug a string first; then send it to the phonetic input or press Synthesize to hear it.',
       el('br'),
-      el('span', { class: 'dim', text: 'Cards are anchor→anchor COARTICULATION stretches, not dictionary syllables: a stretch may fuse the previous syllable’s coda with the next onset (shown as ‿) — that is exactly how the engine groups gestures.' }));
+      el('span', { class: 'dim', text: 'Cards are anchor→anchor stretches: from·consonants·to. * marks a muted anchor (vowel point weighted by COEFCEN, not a vowel of the string). · separates the fields of ONE segment — it is not an anchor.' }));
 
     this.tiles = el('div', { class: 'tiles', id: 'compiler-tiles' });
     this.resultNote = el('div', { class: 'compiler-result-note', id: 'compiler-result-note', style: 'display:none' });
@@ -367,7 +344,7 @@ export class SyllableCompiler {
         class: `bstr-chip mono ${isPause ? 'bstr-pause' : ''} ${s.segment_index === this.selected ? 'sel' : ''}`,
         'data-tip': `segment ${s.segment_index}: ${s.t0.toFixed(2)}–${s.t1.toFixed(2)} s · ${s.n_steps} steps · ${s.kinds.join('+')}`,
         onclick: () => this.selectSegment(s.segment_index),
-      }, s.stretch || s.label || '·');
+      }, s.notation || s.stretch || s.label || '·');
       this.blockString.append(chip);
     }
   }
@@ -392,11 +369,11 @@ export class SyllableCompiler {
       onclick: () => this.selectSegment(s.segment_index),
       onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.selectSegment(s.segment_index); } },
     });
-    const stretch = s.stretch || stretchLabel(s.blocks, s.label_to) || s.label;
+    const stretch = s.notation || s.stretch || s.label || '·';
     card.append(
       el('div', { class: 'card-head' },
         el('span', { class: 'card-idx mono', text: `S${s.segment_index}` }),
-        el('span', { class: 'card-label mono', text: stretch, 'data-tip': 'chronological phoneme string — ‿ marks consonants fusing with the previous vowel (coarticulation, not a syllable boundary)' }),
+        el('span', { class: 'card-label mono', text: stretch, 'data-tip': 'Tile = from·consonants·to of ONE anchor→anchor segment. * marks a muted anchor (vowel point weighted by COEFCEN, not a vowel of the string)' }),
         el('span', { class: 'card-kind', text: kinds.join('+') })),
       el('div', { class: 'card-time mono', text: `${s.t0.toFixed(2)}–${s.t1.toFixed(2)} s · ${s.n_steps} st` }),
     );
