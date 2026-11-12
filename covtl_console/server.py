@@ -136,6 +136,36 @@ SPEAKERS = [
     {"id": "m01", "name": "M01", "origin": "official VTL 2.4 ZIP (male)", "f0": 120.0},
     {"id": "w02", "name": "W02", "origin": "official VTL 2.4 ZIP (female)", "f0": 232.5},
 ]
+# Speaker layer semantics (audit N1 fix, 2026-11-07): a per-request
+# speaker is VALIDATED against the registry and two layers follow it
+# in-process (orthogonal branch .speaker file + f0 from the registry
+# entry — distinct audio per speaker); the geometry/constants layer
+# and the audio anatomy (wheel resource loaded at DLL import) remain
+# process-global — a FULL swap still goes through install_speaker.py
+# + restart (the wheel exposes no hot reload).
+SPEAKER_LAYERS = {
+    "per_request": ["orthogonal_branch (VS/VO/TRX/TRY/TS3)", "f0"],
+    "process_global": ["geometry/constants", "audio anatomy (wheel resource)"],
+    "full_swap": "install_speaker.py + server restart",
+}
+# N2 (audit 2026-11-07): server-side bound on the synthesis text.
+# The UI already caps its input at 2 000 characters (app.js MAX_CHARS);
+# the API used to accept anything — 4 900 characters froze /api/health
+# for ~13 minutes. The bound matches the UI and is documented in the
+# 422 payload; the VTL stage ALSO runs in a subprocess now, so an
+# in-bound 2 000-character job no longer stalls the console either.
+MAX_SYNTH_CHARS = 2000
+# N3 (audit 2026-11-07): an explicit label becomes a file stem inside
+# out/ — validation happens at request time (422) and the surviving
+# characters are sanitized exactly like the engine's sanitize_label.
+_LABEL_SEPARATORS = re.compile(r"[\\/:]")
+_LABEL_UNSAFE = re.compile(r"[^A-Za-z0-9_.\-]")
+_LABEL_MAX = 64
+_WINDOWS_RESERVED = {
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4",
+    "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3",
+    "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+}
 LANG_DEFAULTS = {
     "en": {"tcons": 100, "tvoy": 80,  "tpause": 200, "tpauseLong": 320},
     "fr": {"tcons": 140, "tvoy": 120, "tpause": 200, "tpauseLong": 320},
@@ -282,6 +312,108 @@ def guard_error(rejected: List[Dict[str, Any]]) -> JSONResponse:
         422, "SampaGuardError",
         f"sampa_guard policy=error: {len(rejected)} symbol(s) outside ALL_PHONEME_KEYS: {sym}",
         symbols=rejected)
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Request validation — N1/N2/N3 (audit 2026-11-07)
+# ───────────────────────────────────────────────────────────────────────
+
+def _canonical_speaker(speaker: str) -> Optional[str]:
+    """Canonical registry name for ``speaker`` (case-insensitive).
+
+    Returns the registered canonical name ('JD3' → 'jd3'), the
+    ``"__unknown__"`` sentinel for a name that is NOT registered, or
+    ``None`` when the speaker registry itself is unavailable (degraded
+    engine — validation is then skipped and the engine keeps its
+    historical label semantics).
+    """
+    try:
+        from vtl_synth.core import speaker_registry as sr
+        if not sr.registry_available():
+            return None
+        names = sr.list_speakers()
+    except Exception:
+        return None
+    wanted = str(speaker or "").strip().lower()
+    for n in names:
+        if n.lower() == wanted:
+            return n
+    return "__unknown__"
+
+
+def validate_synth_request(req: "SynthRequest") -> Optional[JSONResponse]:
+    """Pre-flight validation for POST /api/synthesize.
+
+    Returns an error response (422) or None when the request is
+    acceptable. Runs BEFORE any job is created — a rejected request
+    leaves no trace in JOBS (same contract as the guard 422).
+
+    N2 — text length bound: MAX_SYNTH_CHARS (2 000, the UI's own cap).
+    N1 — speaker must be a REGISTERED name (unknown → 422 instead of
+         the former silent acceptance with jd3 audio).
+    N3 — label must not contain path separators / control characters,
+         Windows reserved names, or exceed _LABEL_MAX characters.
+    """
+    text = req.text or ""
+    if len(text) > MAX_SYNTH_CHARS:
+        return api_error(
+            422, "TextTooLong",
+            f"text is {len(text)} characters — the server bound is "
+            f"{MAX_SYNTH_CHARS} (the UI enforces the same cap). Long "
+            "inputs monopolize the synthesis engine for minutes; "
+            "split the text into sentences and synthesize them "
+            "separately.")
+    if LIVE:
+        canonical = _canonical_speaker(req.speaker)
+        if canonical == "__unknown__":
+            try:
+                from vtl_synth.core import speaker_registry as sr
+                registered = "/".join(sr.list_speakers())
+            except Exception:
+                registered = "jd3/s1/s2/m01/w02"
+            return api_error(
+                422, "UnknownSpeaker",
+                f"unknown speaker {req.speaker!r} — registered: "
+                f"{registered}. Speaker names are validated against "
+                "vtl_synth/data/speakers/registry.json (full swap of "
+                "the geometry/audio-anatomy layers: install_speaker.py "
+                "+ restart).")
+    label = req.label
+    if label is not None:
+        if _LABEL_SEPARATORS.search(label):
+            return api_error(
+                422, "InvalidLabel",
+                f"label must not contain path separators ('/', '\\', ':'): "
+                f"{label!r} — labels become file names inside out/.")
+        if any(ord(ch) < 32 for ch in label):
+            return api_error(
+                422, "InvalidLabel",
+                f"label must not contain control characters: {label!r}")
+        if len(label) > _LABEL_MAX:
+            return api_error(
+                422, "InvalidLabel",
+                f"label is {len(label)} characters — the bound is "
+                f"{_LABEL_MAX}.")
+        probe = label.rstrip("._").upper()
+        if probe and probe in _WINDOWS_RESERVED:
+            return api_error(
+                422, "InvalidLabel",
+                f"label {label!r} is a reserved device name on Windows.")
+    return None
+
+
+def sanitize_request_label(label: Optional[str]) -> Optional[str]:
+    """Sanitizes an ALREADY VALIDATED label (N3 defense in depth).
+
+    Mirrors the engine's sanitize_label: every character outside
+    [A-Za-z0-9_.-] maps to '_' — neutralizes glob metacharacters that
+    a downstream ``glob(f'{stem}.*')`` would expand ('*', '?', '[')
+    and any other filename-hostile character. Dots are kept (the
+    engine's label_of keeps them: 'ta~.a~ta' → 'ta_.a_ta').
+    """
+    if label is None:
+        return None
+    return _LABEL_UNSAFE.sub("_", label)
 
 
 app = FastAPI(title="COVTL Console bridge", version="3.0.0",
@@ -877,15 +1009,36 @@ def languages() -> Dict[str, Any]:
 @app.get("/api/speakers")
 def speakers(lang: str = "en") -> Dict[str, Any]:
     active = health().get("active_speaker")
+    # N1 (audit 2026-11-07): the selector is now WIRED — a per-request
+    # speaker changes the audio (orthogonal branch + f0). The payload
+    # says so honestly, and still names the two layers that remain
+    # process-global (geometry/constants + audio anatomy: full swap
+    # through install_speaker.py + restart, the wheel has no hot
+    # reload). Speakers are cross-checked against the engine registry:
+    # an entry the registry does not know is marked unavailable instead
+    # of being silently offered.
+    registry_names = None
+    if LIVE:
+        try:
+            from vtl_synth.core import speaker_registry as sr
+            if sr.registry_available():
+                registry_names = {n.lower() for n in sr.list_speakers()}
+        except Exception:
+            registry_names = None
     out = []
     for s in SPEAKERS:
         verified = s["id"] == "jd3"
+        in_registry = (s["id"] in registry_names
+                       if registry_names is not None else True)
         out.append({"id": s["id"], "label": f"{s['id']} — {s['origin']}",
                     "f0_default": s["f0"], "verified_with_lang": verified,
-                    "active": (active or "").lower().startswith(s["id"])})
+                    "active": (active or "").lower().startswith(s["id"]),
+                    "per_request": True,          # selector is functional (N1)
+                    "in_registry": in_registry})
     warning = UNVERIFIED_WARNING if lang != "en" else None
     return {"speakers": out, "warning_when_unverified": warning,
-            "calibration_speaker": "jd3"}
+            "calibration_speaker": "jd3",
+            "speaker_layers": SPEAKER_LAYERS}
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -1315,6 +1468,12 @@ def synthesize(req: SynthRequest) -> Dict[str, Any]:
             if rejected:
                 return guard_error(rejected)
 
+    # N1/N2/N3 pre-flight (audit 2026-11-07): bound, speaker registry,
+    # label safety — BEFORE any job is created, on every path.
+    rejected_request = validate_synth_request(req)
+    if rejected_request is not None:
+        return rejected_request
+
     with LOCK:
         cached_id = SYNTH_CACHE.get(key)
     if cached_id and cached_id in JOBS and JOBS[cached_id]["state"] == "done":
@@ -1333,6 +1492,23 @@ def synthesize(req: SynthRequest) -> Dict[str, Any]:
             "tcons": t["tcons"], "tvoy": t["tvoy"], "tpause": t["tpause"],
             "tpause_long": t["tpauseLong"], "engine_version": ENGINE_VERSION,
             "sandhi": sandhi_level, "sandhi_mode": sandhi_mode}
+    # N1 honesty: when the requested speaker differs from the ACTIVE
+    # (installed) one, the echo says which layers follow the request —
+    # orthogonal branch + f0 — and which stay process-global.
+    canonical = _canonical_speaker(req.speaker)
+    if canonical is not None and canonical != "__unknown__":
+        echo["speaker"] = canonical
+        try:
+            from vtl_synth.core import speaker_registry as _sr
+            active = _sr.active_name()
+        except Exception:
+            active = None
+        if active is not None and canonical != active:
+            echo["speaker_note"] = (
+                f"per-request layers: orthogonal branch + f0 ({canonical}); "
+                f"geometry and audio anatomy still follow the installed "
+                f"speaker '{active}' — full swap: install_speaker.py + "
+                "server restart")
     if sandhi_level != "off" and SANDHI is None:
         # same degradation the engine will print — surfaced in the job
         # payload so the UI shows it without reading server stdout
@@ -1348,7 +1524,11 @@ def synthesize(req: SynthRequest) -> Dict[str, Any]:
     with LOCK:
         JOBS[job_id] = job
         _prune_jobs()
-    threading.Thread(target=_worker, args=(job_id, req), daemon=True).start()
+    # N3: the worker (and the engine) receive the SANITIZED label —
+    # same string the early polar stage uses for its stem.
+    safe_label = sanitize_request_label(req.label)
+    threading.Thread(target=_worker, args=(job_id, req, safe_label),
+                     daemon=True).start()
     return {"job_id": job_id, "cached": False, "echo": echo}
 
 
@@ -1400,7 +1580,99 @@ def _resolve_sampa(req: SynthRequest, warnings: List[str]) -> str:
     return profile.g2p_callable(req.text or "", warnings=warnings)
 
 
-def _worker(job_id: str, req: SynthRequest) -> None:
+# ──────────────────────────────────────────────────────────────────────
+# N2 — subprocess isolation of the VTL synthesis stage (audit 2026-11-07)
+# ──────────────────────────────────────────────────────────────────────
+# vocaltractlab_cython.synth_block is a native extension that does not
+# release the GIL: in a Python thread it starved the uvicorn loop and
+# the Starlette threadpool (/api/health unresponsive >= 30 s for a
+# 570-character job, ~13 min for 4 900 — audit N2). The stage-2 run
+# therefore executes in a dedicated worker PROCESS (GIL irrelevant);
+# max_workers=1 serializes synthesis jobs (the engine is CPU-bound on
+# one core) and keeps the registry's global state consistent.
+_SYNTH_POOL = None                        # ProcessPoolExecutor | None
+_SYNTH_POOL_LOCK = threading.Lock()
+_SYNTH_POOL_BROKEN = False                # in-process fallback latched
+
+
+def _synth_pool():
+    """The singleton synthesis pool, or None when unavailable."""
+    global _SYNTH_POOL, _SYNTH_POOL_BROKEN
+    if _SYNTH_POOL_BROKEN:
+        return None
+    with _SYNTH_POOL_LOCK:
+        if _SYNTH_POOL is None:
+            try:
+                from concurrent.futures import ProcessPoolExecutor
+                _SYNTH_POOL = ProcessPoolExecutor(max_workers=1)
+            except Exception:
+                _SYNTH_POOL_BROKEN = True
+                return None
+        return _SYNTH_POOL
+
+
+def _run_stage2(payload: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
+    """Executes the full synthesis stage and returns the result dict.
+
+    Subprocess path (normal): the payload — plain picklable primitives
+    — runs through covtl_console._synthproc.run_synthesis in the pool
+    worker; engine exceptions cross the process boundary unchanged
+    (pickle by reference) and land in the job error path as today.
+    In-process fallback (degraded environments): the SAME function is
+    called directly, with a job note saying the console may stall
+    during long syntheses (the pre-fix behaviour, now explicit).
+    """
+    global _SYNTH_POOL_BROKEN
+    from covtl_console import _synthproc
+    pool = _synth_pool()
+    if pool is not None:
+        try:
+            return pool.submit(_synthproc.run_synthesis, payload).result()
+        except BrokenProcessPool:
+            # worker died (shutdown / OS kill): latch the fallback and
+            # retry once in-process — the job still completes.
+            _SYNTH_POOL_BROKEN = True
+            job.setdefault("notes", []).append(
+                "synthesis subprocess pool broken — retrying in-process "
+                "(the console may stall during long syntheses)")
+        except Exception:
+            raise                    # engine error: job error path, as before
+    else:
+        job.setdefault("notes", []).append(
+            "synthesis subprocess isolation unavailable — running "
+            "in-process (the console may stall during long syntheses)")
+    return _synthproc.run_synthesis(payload)
+
+
+@app.on_event("shutdown")
+def _shutdown_synth_pool() -> None:
+    """Stops the synthesis pool without waiting for an in-flight job.
+
+    concurrent.futures joins its workers at interpreter exit; a
+    minutes-long synthesis must not hold Ctrl+C hostage (the
+    pre-fix daemon-thread behaviour). Best-effort terminate.
+    """
+    pool = _SYNTH_POOL
+    if pool is None:
+        return
+    try:
+        pool.shutdown(wait=False, cancel_futures=True)
+    except Exception:
+        pass
+    # _processes is a dict {pid: Process} up to py3.11 and a list since
+    # py3.12 — normalize before the best-effort terminate.
+    procs = getattr(pool, "_processes", None) or ()
+    if isinstance(procs, dict):
+        procs = list(procs.values())
+    for proc in list(procs):
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+
+
+def _worker(job_id: str, req: SynthRequest,
+            safe_label: Optional[str] = None) -> None:
     job = JOBS[job_id]
     try:
         if job["cancelled"]:
@@ -1432,7 +1704,6 @@ def _worker(job_id: str, req: SynthRequest) -> None:
         if "pause_short_ms" in sig: kwargs["pause_short_ms"] = t["tpause"]
         if "pause_long_ms" in sig: kwargs["pause_long_ms"] = t["tpauseLong"]
 
-        pipe = Pipeline(**kwargs)
         job.update(state="running", stage="g2p", progress=0.05)
         out_dir = (OUT_ROOT / re.sub(r"[^A-Za-z0-9_\-]", "_", req.outputDir or "out"))
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -1447,8 +1718,15 @@ def _worker(job_id: str, req: SynthRequest) -> None:
         # Delegating to the engine's own label_of keeps the two identical
         # by construction (the import cannot fail: Pipeline above already
         # loaded this very module).
+        #
+        # N3 (audit 2026-11-07): an EXPLICIT label arrives here ALREADY
+        # sanitized by the bridge (validate_synth_request +
+        # sanitize_request_label — separators rejected 422, unsafe
+        # characters mapped to '_'); the engine re-applies its own
+        # sanitize_label (idempotent on this input), so both stems agree.
         from vtl_synth.core.pipeline import label_of as _engine_label_of
-        stem = (req.label or _engine_label_of(req.text or "output")).rstrip("._") \
+        stem = (safe_label if safe_label is not None
+                else _engine_label_of(req.text or "output")).rstrip("._") \
             or "output"
 
         # ── stage 1 — trajectory structure (cheap, pure Python) ──
@@ -1503,9 +1781,24 @@ def _worker(job_id: str, req: SynthRequest) -> None:
 
         threading.Thread(target=tick, daemon=True).start()
 
-        result = pipe.run(req.text, output_dir=str(out_dir), use_g2p=use_g2p,
-                          video=video, label=req.label, polar=req.outputMode == "polar",
-                          sampa_guard=req.guardPolicy)
+        # N2 (audit 2026-11-07): the VTL stage runs in a WORKER
+        # SUBPROCESS — the native synth_block holds the GIL for the
+        # whole synthesis, which starved the uvicorn loop (health
+        # unresponsive >= 30 s for 570 characters, ~13 min for 4 900).
+        # max_workers=1 also serializes synthesis jobs (the engine is
+        # CPU-bound on one core; the registry's global state stays
+        # consistent). In-process fallback when no pool can be created.
+        payload = {
+            "pipeline": kwargs,
+            "text": req.text,
+            "output_dir": str(out_dir),
+            "use_g2p": use_g2p,
+            "video": video,
+            "label": safe_label,
+            "polar": req.outputMode == "polar",
+            "sampa_guard": req.guardPolicy,
+        }
+        result = _run_stage2(payload, job)
         stop.set()
 
         if job["cancelled"]:
@@ -1514,7 +1807,7 @@ def _worker(job_id: str, req: SynthRequest) -> None:
                        error_class="Cancelled")
             return
 
-        stem = result.tract_path.stem
+        stem = result["stem"]
         # Rate contract (maintainer-confirmed 2026-11-04, locked by
         # tests/test_synthesis.py::test_tract_400hz_walk_100hz_contract):
         # the .tract files are 400 Hz BY CONSTRUCTION (the engine's
@@ -1540,11 +1833,12 @@ def _worker(job_id: str, req: SynthRequest) -> None:
 
         # if the early polar stage was skipped/failed but the engine wrote
         # its own .polar (polar video mode), adopt it and rebuild structure
-        if not job.get("polar_ready") and result.polar_path and Path(result.polar_path).exists():
-            paths["polar"] = str(result.polar_path)
+        engine_polar = result.get("polar_path")
+        if not job.get("polar_ready") and engine_polar and Path(engine_polar).exists():
+            paths["polar"] = str(engine_polar)
             if structure is None:
                 try:
-                    structure = structure_compile(result.sampa, req.lang, req.timings)
+                    structure = structure_compile(result["sampa"], req.lang, req.timings)
                     job["structure"] = structure
                     job["anchors"] = structure["anchors"]
                     job["block_count"] = structure["metrics"]["segments"]
@@ -1556,9 +1850,9 @@ def _worker(job_id: str, req: SynthRequest) -> None:
             state="done", stage="wav" if not video else "video", progress=1.0,
             wav_ready=True,
             result={
-                "sampa": result.sampa, "warnings": result.warnings,
-                "duration": result.duration_s, "frames": result.n_frames,
-                "phrases": len(result.phrases),
+                "sampa": result["sampa"], "warnings": result["warnings"],
+                "duration": result["duration_s"], "frames": result["n_frames"],
+                "phrases": result["phrases"],
                 "files": files, "label": stem,
                 "wav_url": f"/api/job/{job_id}/files/{stem}.wav",
             })

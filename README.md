@@ -98,6 +98,51 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
   module into `covtl-console-standalone.html`, which works from `file://`
   and talks to the bridge on 127.0.0.1:8421 when one is running.
 
+## Robustness & safety (correction round 2026-11-07)
+
+Three audit findings were corrected; the behaviours below are the
+contract the tests lock (`tests/test_fixes_n1_n2_n3.py`, engine side:
+`covtl-pipeline` `tests/test_speaker_resolution.py`).
+
+**Speaker selector is functional per request (N1).** `speaker` in
+`POST /api/synthesize` is validated against the engine's speaker
+registry — an unknown name is **422 `UnknownSpeaker`** (no job starts)
+instead of the former silent acceptance with jd3 audio. A registered
+speaker changes the audio in the same server process through two
+layers: the **orthogonal branch** (VS/VO/TRX/TRY/TS3 — the registered
+`.speaker` file) and **f0** (the speaker's registry `f0_default`).
+Two layers remain process-global by engine design: the
+geometry/constants and the **audio anatomy** (the wheel loads its
+`.speaker` at DLL import and exposes no hot reload) — a *full* speaker
+swap still goes through `install_speaker.py` + restart. `/api/speakers`
+publishes this layer split (`speaker_layers`), and the job `echo`
+carries a `speaker_note` whenever the requested speaker differs from
+the installed one. Case is ignored (`JD3` → `jd3`); requesting the
+active speaker is bit-identical to the historical output.
+
+**Long syntheses no longer freeze the console (N2).** The native VTL
+synthesis (`synth_block`) holds the GIL for the whole job; it now runs
+in a dedicated **worker subprocess** (`max_workers=1`, serialized jobs —
+the engine is CPU-bound on one core). `/api/health` answers in the
+millisecond range *during* a synthesis (verified: max 0.01 s over 1 400
+probes while a ~140 s job ran). The API additionally enforces the
+UI's own text cap: **422 `TextTooLong` above 2 000 characters**
+(split long texts into sentences). If no process pool can be created,
+the bridge falls back to in-process execution and says so in the job
+`notes` ("the console may stall during long syntheses"). Ctrl+C is not
+held hostage by an in-flight job: the pool is terminated on shutdown.
+
+**Labels cannot escape `out/` (N3).** An explicit `label` becomes a
+file stem; it is validated at request time — path separators `/ \ :`,
+control characters, Windows reserved device names and labels over 64
+characters are **422 `InvalidLabel`** (no job starts) — and the
+surviving characters are sanitized exactly like the engine's
+`sanitize_label` (everything outside `[A-Za-z0-9_.-]` maps to `_`,
+which also neutralizes glob metacharacters `* ? [`; dots stay, as in
+the engine's own `label_of`). The engine re-applies the same guard on
+its side (defense in depth — the CLI benefits too). `outputDir` keeps
+its historical sanitization.
+
 ## Requirements
 
 - **Python 3.9 or later** (3.12 recommended) with `pip`

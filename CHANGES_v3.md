@@ -23,6 +23,85 @@ Deliverables:
 ---
 
 
+## Correction round — N1/N2/N3 (2026-11-07)
+
+External audit findings N1 (speaker parameter without effect), N2
+(server freeze during long syntheses) and N3 (file written outside
+out/ via label). Fixes span the console AND the engine (covtl-pipeline
+branch `fix/n1-n3-speaker-label`: `resolve_speaker`/`sanitize_label`
+in `vtl_synth/core/pipeline.py`).
+
+### Verified code-level facts
+
+- N1 — `POST /api/synthesize` validates `speaker` against the engine
+  registry: unknown name → **422 `UnknownSpeaker`**, no job
+  (`validate_synth_request` in `covtl_console/server.py`). The engine
+  resolves a registered name per request (`Pipeline.__init__` →
+  `resolve_speaker`): the orthogonal branch reads the registered
+  `.speaker` file (`speaker_file` forwarded to `build_phrase_tract`)
+  and `f0_hz=None` follows the REQUESTED speaker's registry
+  `f0_default`. Requesting the active speaker is byte-identical to the
+  previous output (same file, same f0); 5 speakers now produce 5
+  distinct WAVs (were: 5× identical jd3 bytes, SHA256 411c3daa…).
+- N1 honesty — `/api/speakers` publishes `speaker_layers`
+  (per_request: orthogonal branch + f0; process_global:
+  geometry/constants + audio anatomy; full_swap:
+  install_speaker.py + restart) and `in_registry` per entry; the job
+  `echo` canonicalizes the name and carries `speaker_note` when it
+  differs from the installed speaker.
+- N2 — stage 2 (tract + wav [+ mp4]) executes in a
+  `ProcessPoolExecutor(max_workers=1)` worker process
+  (`covtl_console/_synthproc.py::run_synthesis`; payload/result are
+  picklable dicts; engine exceptions cross the boundary unchanged).
+  Measured: `/api/health` max 0.01 s over 1 400 probes while a ~140 s
+  synthesis ran (before: unresponsive ≥ 30 s at 570 chars, ~13 min at
+  4 900). In-process fallback (same function) latches on
+  `BrokenProcessPool`/pool-creation failure with an explicit job note.
+  Pool terminated on app shutdown so Ctrl+C is not held hostage
+  (`_shutdown_synth_pool`; `_processes` dict→list across py3.11/3.12
+  normalized).
+- N2 — server-side text bound: **422 `TextTooLong` above
+  `MAX_SYNTH_CHARS` = 2000** (equals the UI's `MAX_CHARS`, asserted by
+  test), message tells the user to split into sentences.
+- N3 — `label` pre-flight: separators `/ \ :`, control characters,
+  Windows reserved device names, > 64 chars → **422 `InvalidLabel`**,
+  no job; surviving characters sanitized like the engine's
+  `sanitize_label` (`[^A-Za-z0-9_.-]` → `_`, glob metacharacters
+  neutralized, dots kept — finding F1 semantics preserved); the worker
+  and the engine receive the SANITIZED label (engine re-guard is
+  idempotent). `outputDir` sanitization unchanged.
+- Tests: `tests/test_fixes_n1_n2_n3.py` (19: 422 contracts, distinct
+  audio per speaker, health-responsiveness during synthesis, label
+  sanitization on disk; 1 slow-marked). Engine:
+  `tests/test_speaker_resolution.py` (23: resolution, per-request
+  ortho layer, distinct tracts/WAVs, label guards). Console suite:
+  78 passed (60 before + 18 new non-slow), engine suite 211 passed +
+  23 new = 234, the 3 pre-existing environment failures
+  (registry hash + 2 syltraj byte baselines, numpy/line-ending
+  sensitive) unchanged.
+
+### Interpretive points
+
+- The per-request speaker is a LAYERED switch, honestly partial: s1/s2
+  speaker files share jd3's orthogonal columns (verified: identical
+  tract for 'p a p a' at equal f0), so their audible difference rides
+  on f0; m01/w02 differ in the tract as well. The geometry and the
+  audio anatomy stay with the installed speaker — that boundary is the
+  wheel's (no hot reload), stated in `/api/speakers`, the echo note
+  and the README.
+- N2's `max_workers=1` serializes synthesis jobs deliberately: the
+  engine is CPU-bound on one core and the registry's process-global
+  state stays consistent; a queue of requests degrades gracefully
+  (jobs run back-to-back).
+
+### Out of scope (listed, not fixed)
+
+- CORS `allow_origins=["*"]` on a 127.0.0.1 bind remains by design
+  (local tool, UI may run from `file://`); N3 removed the write
+  primitive a rogue page could use, arbitrary READ was never possible
+  (files endpoint serves registered paths only — audit-tested 404).
+
+
 ## Notation refactor — FROM·CONSONANTS·TO (2026-11-04)
 
 ### Verified code-level facts
