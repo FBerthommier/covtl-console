@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "covtl-console"
-version = "3.1.1"
+version = "3.1.2"
 description = "COVTL Lab Console — local web interface for covtl-pipeline (G2P preview, SAMPA guard, syllable compiler, continuous polar display)"
 readme = "README.md"
 requires-python = ">=3.9"
 license = "GPL-3.0-or-later"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 authors = [
     {name = "Frédéric Berthommier"},
 ]
