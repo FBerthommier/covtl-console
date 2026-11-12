@@ -13,13 +13,17 @@ from conftest import ENGINE_AVAILABLE, requires_engine
 JS_MODULES = ["data", "render", "api", "polar", "spectrogram",
               "compiler", "app"]
 
+# The bridge version literals follow the package version (audit §1/N5
+# drift); every version assertion in the suite compares against it.
+from covtl_console import __version__ as BRIDGE_VERSION
+
 
 # ── always-on: static assets, transport headers ────────────────────────
 def test_status_shape(client):
     r = client.get("/api/status")
     assert r.status_code == 200
     body = r.json()
-    assert body["bridge"] == "3.1.0"
+    assert body["bridge"] == BRIDGE_VERSION
     assert body["engine"] == "vtl-synth"
     assert body["backend"] in ("live", "mock")
     if ENGINE_AVAILABLE:
@@ -36,7 +40,7 @@ def test_health_shape(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] in ("ok", "degraded", "offline")
-    assert body["bridge"] == "3.1.0"
+    assert body["bridge"] == BRIDGE_VERSION
     if ENGINE_AVAILABLE:
         assert body["status"] in ("ok", "degraded")
         assert body["engine_version"]

@@ -67,6 +67,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+# Single source of truth for the bridge version (audit §1/N5: the
+# literals had drifted to 3.0.0 while the package is 3.1.0).
+from covtl_console import __version__ as BRIDGE_VERSION
+
 # UI assets ship INSIDE the package (pip installs serve them from
 # site-packages); synthesis artifacts land in the current working
 # directory's out/ — the same place when run from a repository checkout.
@@ -79,10 +83,6 @@ OUT_ROOT.mkdir(exist_ok=True)
 # ──────────────────────────────────────────────────────────────────────
 LIVE = False
 ENGINE_VERSION = "unknown"
-# Bridge surface version (FastAPI title, /api/health, /api/status) — kept
-# in sync with the covtl-console package version (audit N5: the fields
-# said 3.0.0 while the package is 3.1.0).
-BRIDGE_VERSION = "3.1.0"
 _import_errors: List[str] = []
 try:
     from vtl_synth import Pipeline                                   # noqa: F401
