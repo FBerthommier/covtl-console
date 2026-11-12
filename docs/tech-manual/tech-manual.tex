@@ -8,7 +8,10 @@
 \setlength{\parskip}{0.38em}
 \setlength{\parindent}{0pt}
 \newcommand{\key}[1]{\textbf{#1}}
-\newcommand{\utie}{\texttildelow}   % the engine's coda-fusion marker (U+203F)
+\newcommand{\utie}{\texttildelow}   % legacy coda-fusion marker (U+203F) —
+                                    % REMOVED from the tile notation
+                                    % (FROM·CONSONANTS·TO); kept only in
+                                    % this comment for history
 
 \title{COVTL Lab Console --- Technical Reference\\[4pt]\large Bridge API, anchor instrumentation, clocks, caching, extension guide}
 \author{Fr\'ed\'eric Berthommier}
@@ -80,8 +83,8 @@ above the head (stacking visibly on stationary holds), superseding the
 former amber ``next anchor'' ring. \\
 \texttt{spectrogram.js} & \texttt{SpectrogramView}: FFT spectrogram;
 \texttt{setSource} accepts the anchor list for the overlay. \\
-\texttt{compiler.js} & \texttt{SyllableCompiler} panel +
-\texttt{stretchLabel}/\texttt{segmentLabel}. \\
+\texttt{compiler.js} & \texttt{SyllableCompiler} panel; tile labels read
+the server-side \texttt{notation} field (single definition). \\
 \texttt{app.js} & Controller: state machine, flows (preview / compile /
 synthesize / playback), transport wiring, keyboard, settings
 (\texttt{covtl.settings.v3}), history (\texttt{covtl.history.v1}). \\
@@ -141,10 +144,14 @@ still works, forwarding to the unified preview.) \\
 \texttt{\{text, lang, timings, guard\_policy, expressive, sandhi,
 sandhi\_mode\}}. Runs the
 engine's anchor walk with \emph{no synthesis}: response carries
-\texttt{anchors[], blocks[], nodes[], metrics\{anchors, segments, blocks,
+\texttt{anchors[]} (each anchor exports \texttt{mute} / \texttt{syl\_onset};
+muted anchors are labeled with the vowel their point derives from plus
+\texttt{*}), \texttt{blocks[], nodes[], metrics\{anchors, segments, blocks,
 syllables, clusters, consonants, vowels, steps, duration\_s\}},
-\texttt{segments\_preview[]} (per anchor pair: label, chronological
-\texttt{stretch} with the \utie{} coda marker, cons/vowel, kinds, n\_steps),
+\texttt{segments\_preview[]} (per anchor pair: label,
+\texttt{notation} = from·consonants·to --- the tile grammar, defined once in
+\texttt{segment\_notation()} and shared with \texttt{/api/job/\{id\}/polar} ---
+cons/vowel, kinds, n\_steps),
 per-phoneme \texttt{targets\{rho, theta, category\}}, rejected symbols,
 warnings, the \texttt{sandhi} capability block. A requested sandhi level
 is a documented no-op here (SAMPA blocks carry no orthography — the
@@ -345,7 +352,7 @@ invalidates entries across engine upgrades instead of serving old-engine
 audio.
 
 Client side, \texttt{api.js} keeps mirrors for instant UI replay;
-\texttt{clearDemoCaches()} wipes them when the probe flips
+\texttt{clearCaches()} wipes them when the probe flips
 
 \section{Front-end state machine and WYSIWYG paths}
 

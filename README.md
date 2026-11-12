@@ -27,7 +27,7 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
 ├────────────┬─────────────────────────────────────────────────────────────┤
 │ Controls   │ Stage                                                       │
 │ 1 Lang&Spk │  Preview stack: G2P → enriched → final SAMPA (red reject)   │
-│ 2 Input    │  Action bar: Preview(P) · Synthesize(S) · from edited(E)    │
+│ 2 Input    │  Action bar: Preview(P) · Synthesize the framed source(S)   │
 │ 3 Timings  │  Syllable compiler: tiles · block sequence · block cards    │
 │ 4 Prosody  │  Continuous polar display: Block k/n · A_k→A_k+1 · ρ/θ      │
 │ 5 Engine   │  Transport: play · A− A+ · scrub(anchor ticks) · speeds     │
@@ -112,8 +112,6 @@ controls. Nothing leaves your machine — no cloud, no telemetry.
   bridge reports the six rule languages on `/api/health`.
 - Bridge dependencies: `fastapi` and `uvicorn`
 
-simulated G2P/guard/audio and an approximate compiler — clearly labeled as
-such in the UI.
 
 ## Flash install
 
@@ -288,8 +286,9 @@ another speaker with a non-English language triggers the console's
    Enter. The compiler panel shows metric tiles, the block sequence, and
    clickable cards with (ρ, θ) targets — the engine's own anchor walk, no
    synthesis.
-3. **Synthesize** — press `S` (or `E` to synthesize exactly the edited
-   SAMPA shown on screen). Watch ⏳ progress, then play the result, read
+3. **Synthesize** — press `S`: the single button speaks exactly the
+   blue-framed source (main input / edited SAMPA / compiler blocks).
+   Watch ⏳ progress, then play the result, read
    the spectrogram, follow the polar display anchor by anchor, and download
    artifacts from the downloads menu (`D`).
 

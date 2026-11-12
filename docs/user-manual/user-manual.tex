@@ -7,7 +7,6 @@
 \usepackage[hidelinks]{hyperref}
 
 \newcommand{\key}[1]{\textbf{#1}}
-\newcommand{\utie}{\texttildelow}          % the engine's coda-fusion marker (U+203F)
 \newcommand{\ovs}{\textvisiblespace}       % the open-box space marker (U+2423)
 \setlength{\parskip}{0.34em}
 \setlength{\parindent}{0pt}
@@ -260,12 +259,14 @@ for the current journey only. A count like \textbf{``i$\cdot$4''} means
 \emph{phonemes share this same target position} within the journey ---
 the engine's target-sharing, printed as \texttt{key$\cdot$n}.
 
-\paragraph{Stretches.} On the compiler cards, a segment label like
-\textbf{``i\utie{}k''} reads: vowel \texttt{i} fused with the following
-consonant \texttt{k}. The tie \textbf{\utie} marks consonants that follow a
-vowel \emph{inside the same anchor-to-anchor stretch} --- the coda of one
-syllable coarticulated with the next onset. That is exactly how the
-engine groups gestures; it is not a dictionary syllable.
+\paragraph{Tiles.} On the compiler cards, a segment label like
+\textbf{``i$\cdot$k$\cdot$i*''} reads: from anchor \texttt{i}, through the
+consonant \texttt{k}, to the anchor \texttt{i*}. The \textbf{$\cdot$}
+separates the fields of ONE anchor-to-anchor segment --- it is not an
+anchor. A \textbf{*} marks a \emph{muted anchor}: a timing joint whose
+point is the preceding vowel weighted by COEFCEN, not a vowel of the
+string. That is exactly how the engine groups gestures; it is not a
+dictionary syllable.
 
 \paragraph{The consonantal loop.} The blue excursion is a \emph{closed
 loop attached to the vocalic path at both anchors of the pair}: it
@@ -328,7 +329,7 @@ The panel (Figure~\ref{fig:compiler}) shows:
 \item \textbf{Metric tiles} --- syllables, anchors, blocks, consonant and
   vowel counts, planned duration.
 \item \textbf{Block sequence} --- one chip per anchor-to-anchor segment,
-  in time order; the stretch labels (with the \utie{} marker) appear here.
+  in time order; the tile notation (from·consonants·to) appears here.
 \item \textbf{Block cards} --- click to expand: onset cluster consonants
   with their $(\rho,\theta)$ targets, the nucleus vowel plateau, block
   kinds, and time span. \emph{``Use in phonetic input $\rightarrow$''}
