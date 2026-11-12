@@ -33,7 +33,7 @@ def test_pyproject_declares_flash_install():
         encoding="utf-8"))
     deps = " ".join(data["project"]["dependencies"])
     assert "vtl-synth==1.1.2" in deps
-    assert "covtl-sandhi==0.1.0" in deps
+    assert "covtl-sandhi==0.1.1" in deps
     scripts = data["project"]["scripts"]
     assert scripts.get("covtl-console") == "covtl_console.server:main"
     ui = data["tool"]["setuptools"]["package-data"]["covtl_console"]
