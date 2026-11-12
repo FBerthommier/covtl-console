@@ -79,6 +79,10 @@ OUT_ROOT.mkdir(exist_ok=True)
 # ──────────────────────────────────────────────────────────────────────
 LIVE = False
 ENGINE_VERSION = "unknown"
+# Bridge surface version (FastAPI title, /api/health, /api/status) — kept
+# in sync with the covtl-console package version (audit N5: the fields
+# said 3.0.0 while the package is 3.1.0).
+BRIDGE_VERSION = "3.1.0"
 _import_errors: List[str] = []
 try:
     from vtl_synth import Pipeline                                   # noqa: F401
@@ -88,7 +92,12 @@ try:
         from importlib.metadata import version as _pkg_version
         ENGINE_VERSION = _pkg_version("vtl-synth")
     except Exception:
-        ENGINE_VERSION = "installed"
+        # Frozen bundles (PyInstaller) carry no vtl-synth dist-info, so
+        # importlib.metadata cannot resolve it — the UI then showed
+        # 'engine vinstalled' (audit N5). Fall back to the engine's own
+        # __version__; 'installed' remains the last resort.
+        import vtl_synth as _vs
+        ENGINE_VERSION = str(getattr(_vs, "__version__", "installed"))
 except Exception as exc:                                   # pragma: no cover
     _import_errors.append(f"{type(exc).__name__}: {exc}")
 
@@ -353,6 +362,9 @@ def validate_synth_request(req: "SynthRequest") -> Optional[JSONResponse]:
          the former silent acceptance with jd3 audio).
     N3 — label must not contain path separators / control characters,
          Windows reserved names, or exceed _LABEL_MAX characters.
+    N5 — timings overrides must be strictly positive (a negative or
+         zero duration is meaningless; the engine rounds to 10 ms steps
+         and previously accepted e.g. tcons=-50 silently).
     """
     text = req.text or ""
     if len(text) > MAX_SYNTH_CHARS:
@@ -363,6 +375,13 @@ def validate_synth_request(req: "SynthRequest") -> Optional[JSONResponse]:
             "inputs monopolize the synthesis engine for minutes; "
             "split the text into sentences and synthesize them "
             "separately.")
+    for tk, tv in (req.timings or {}).items():
+        if tv is not None and tv <= 0:
+            return api_error(
+                422, "InvalidTimings",
+                f"timings[{tk!r}] = {tv} — durations are milliseconds "
+                "and must be strictly positive (the engine rounds to "
+                "10 ms steps).")
     if LIVE:
         canonical = _canonical_speaker(req.speaker)
         if canonical == "__unknown__":
@@ -416,7 +435,7 @@ def sanitize_request_label(label: Optional[str]) -> Optional[str]:
     return _LABEL_UNSAFE.sub("_", label)
 
 
-app = FastAPI(title="COVTL Console bridge", version="3.0.0",
+app = FastAPI(title="COVTL Console bridge", version=BRIDGE_VERSION,
               description="Local REST bridge for covtl-pipeline (vtl-synth).")
 
 
@@ -985,7 +1004,7 @@ def health() -> Dict[str, Any]:
         except Exception:
             pass
     return {"status": status, "engine_version": engine_version,
-            "bridge": "3.0.0", "active_speaker": active_speaker,
+            "bridge": BRIDGE_VERSION, "active_speaker": active_speaker,
             "active_lang": active_lang, "registry_warnings": warnings,
             "sandhi": sandhi_capability()}
 
@@ -1051,7 +1070,7 @@ def status() -> Dict[str, Any]:
         "backend": "live" if LIVE else "mock",
         "engine": "vtl-synth",
         "version": ENGINE_VERSION,
-        "bridge": "3.0.0",
+        "bridge": BRIDGE_VERSION,
         "mode": "vtl_synth" if LIVE else "vtl_synth not importable",
         "speakers": SPEAKERS,
         "languages": list(LANG_DEFAULTS.keys()),
@@ -1285,6 +1304,14 @@ class G2PRequest(BaseModel):
 
 @app.post("/api/preview/g2p")
 def preview_g2p(req: G2PRequest) -> Dict[str, Any]:
+    # Audit N5: this deprecated v1 endpoint accepted an empty/missing text
+    # with 200 (the field is Optional) while /api/synthesize rejects it —
+    # align the contract (422, no traceback).
+    if not (req.text or "").strip() and not (req.sampa or "").strip():
+        return api_error(
+            422, "EmptyText",
+            "text is empty — nothing to transcribe (same contract as "
+            "POST /api/synthesize).")
     r = preview(PreviewRequest(text=req.text, sampa=req.sampa, lang=req.lang,
                                expressive=req.expressive, mode="ortho"))
     return {"sampa": r["enriched_string"], "warnings": r["warnings"],

@@ -239,7 +239,7 @@ def test_glob_metachar_label_sanitized(client, S):
 
 @requires_engine
 def test_dotted_label_still_works(client, S):
-    """Dots in labels are legitimate (engine label_of keeps them —
+    """Dots in labels are legitimate (engine label_of keeps them -
     finding F1): 'v1.2' must reach disk unchanged."""
     r = _post(client, label="v1.2")
     assert r.status_code == 200
@@ -248,3 +248,39 @@ def test_dotted_label_still_works(client, S):
     assert job["result"]["label"] == "v1.2"
     wav_key = next(k for k in job["paths"] if k.endswith(".wav"))
     assert Path(job["paths"][wav_key]).name == "v1.2.wav"
+
+
+# ──────────────────────────────────────────────────────────────────────
+# N5 — cosmetic audit findings (bridge version, lax preview/g2p,
+# unbounded timings)
+# ──────────────────────────────────────────────────────────────────────
+
+def test_bridge_version_matches_package():
+    """The bridge surface version must track the covtl-console package
+    version (audit N5: the fields said 3.0.0 while the package is 3.1.x)."""
+    from covtl_console import __version__ as pkg_version
+    import covtl_console.server as _srv
+    assert _srv.BRIDGE_VERSION == pkg_version
+
+
+@pytest.mark.parametrize("timings", [
+    {"tcons": -50},       # audit n15 — was silently accepted
+    {"tvoy": 0},
+    {"tpause": -1.5},
+])
+def test_nonpositive_timings_422_no_job(client, S, timings):
+    n_jobs = len(S.JOBS)
+    r = _post(client, timings=timings)
+    assert r.status_code == 422, timings
+    assert r.json()["error"]["class"] == "InvalidTimings"
+    assert len(S.JOBS) == n_jobs, "no job may start on invalid timings"
+
+
+def test_preview_g2p_empty_text_422(client):
+    """The deprecated v1 endpoint used to answer 200 on an empty text
+    (Optional field) while /api/synthesize rejects it — same contract."""
+    r = client.post("/api/preview/g2p", json={"lang": "fr"})
+    assert r.status_code == 422
+    assert r.json()["error"]["class"] == "EmptyText"
+    r = client.post("/api/preview/g2p", json={"text": "   ", "lang": "fr"})
+    assert r.status_code == 422

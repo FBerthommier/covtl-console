@@ -19,7 +19,7 @@ def test_status_shape(client):
     r = client.get("/api/status")
     assert r.status_code == 200
     body = r.json()
-    assert body["bridge"] == "3.0.0"
+    assert body["bridge"] == "3.1.0"
     assert body["engine"] == "vtl-synth"
     assert body["backend"] in ("live", "mock")
     if ENGINE_AVAILABLE:
@@ -36,7 +36,7 @@ def test_health_shape(client):
     assert r.status_code == 200
     body = r.json()
     assert body["status"] in ("ok", "degraded", "offline")
-    assert body["bridge"] == "3.0.0"
+    assert body["bridge"] == "3.1.0"
     if ENGINE_AVAILABLE:
         assert body["status"] in ("ok", "degraded")
         assert body["engine_version"]
