@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Frédéric Berthommier
+﻿# SPDX-FileCopyrightText: 2026 Frédéric Berthommier
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Flash-install packaging tests — no engine needed.
 
@@ -32,8 +32,8 @@ def test_pyproject_declares_flash_install():
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(
         encoding="utf-8"))
     deps = " ".join(data["project"]["dependencies"])
-    assert "vtl-synth @ git+https://github.com/FBerthommier/covtl-pipeline.git" in deps
-    assert "covtl-sandhi @ git+https://github.com/FBerthommier/covtl-sandhi.git" in deps
+    assert "vtl-synth==1.1.1" in deps
+    assert "covtl-sandhi==0.1.0" in deps
     scripts = data["project"]["scripts"]
     assert scripts.get("covtl-console") == "covtl_console.server:main"
     ui = data["tool"]["setuptools"]["package-data"]["covtl_console"]
