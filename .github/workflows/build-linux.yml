@@ -19,7 +19,7 @@ on:
       - '.github/workflows/build-linux.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   linux:
@@ -89,3 +89,17 @@ jobs:
             packaging/linux/validation/SHA256SUMS.txt
           retention-days: 30
           if-no-files-found: error
+
+      - name: Publier le ZIP en release GitHub (telechargeable anonymement)
+        if: success()
+        working-directory: packaging/linux
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(sha256sum releases/COVTL-Console-Linux-x64.zip | cut -d' ' -f1)
+          gh release delete linux-standalone --yes --cleanup-tag || true
+          gh release create linux-standalone \
+            --title "COVTL Console — standalone Linux x64 (3.1.5)" \
+            --notes "Build automatique (PyInstaller onedir, Python 3.12, smoke avec synthese + video MP4). sha256: $sha" \
+            --latest \
+            releases/COVTL-Console-Linux-x64.zip#COVTL-Console-Linux-x64.zip

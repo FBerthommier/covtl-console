@@ -46,7 +46,7 @@ if [ "${RUN_SMOKE:-0}" = "1" ]; then
 fi
 
 echo "==> [6/6] Emballage release + porte d'hygiène B2"
-python3 build/zip-release-b2.py
+python3 build/zip-release-b2.py "$ROOT/dist/linux/covtl-console"
 
 echo ""
 echo "Terminé — release régénérée : releases/COVTL-Console-Linux-x64.zip"

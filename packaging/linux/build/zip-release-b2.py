@@ -56,7 +56,7 @@ def build(src: pathlib.Path) -> None:
                    if "/out/" in n or n.endswith(EXCL_EXT)
                    or "__pycache__" in n or ".git" in n or ".venv" in n]
         bad = z.testzip()
-    ok = not residue and bad is None
+    ok = not residue and bad is None and len(entries)   # fail-closed: un zip vide = 22 octets
     h = sha256(dst)
 
     val = ROOT / "validation"
