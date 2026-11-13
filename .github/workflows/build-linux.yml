@@ -37,7 +37,19 @@ jobs:
         working-directory: packaging/linux
         env:
           RUN_SMOKE: '1'
-        run: bash rebuild.sh
+        shell: bash
+        run: |
+          set -o pipefail
+          bash rebuild.sh 2>&1 | tee rebuild-run.log
+
+      - name: Upload build log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: packaging/linux/rebuild-run.log
+          retention-days: 14
+          if-no-files-found: error
 
       - name: Empreintes et tailles
         working-directory: packaging/linux
