@@ -99,7 +99,7 @@ jobs:
           sha=$(sha256sum releases/COVTL-Console-Linux-x64.zip | cut -d' ' -f1)
           gh release delete linux-standalone --yes --cleanup-tag || true
           gh release create linux-standalone \
-            --title "COVTL Console — standalone Linux x64 (3.1.5)" \
+            --title "COVTL Console — standalone Linux x64 (3.1.6)" \
             --notes "Build automatique (PyInstaller onedir, Python 3.12, smoke avec synthese + video MP4). sha256: $sha" \
             --latest \
             releases/COVTL-Console-Linux-x64.zip#COVTL-Console-Linux-x64.zip
