@@ -1,0 +1,15 @@
+# Phase 1 — dépendances réelles depuis PyPI.
+# TestPyPI héberge un parasite FASTAPI-1.0 qui casse la résolution directe de
+# covtl-console : la chaîne covtl (covtl-console==3.1.4, qui tire covtl-sandhi
+# et vtl-synth) s'installe donc en phase 2 séparée, depuis TestPyPI.
+# Reconduction exacte de l'environnement livré : build/requirements-freeze.txt.
+fastapi>=0.100
+uvicorn>=0.20
+numpy>=1.22
+scipy>=1.7
+vocaltractlab-cython>=0.0.10
+Pillow>=9.0
+imageio-ffmpeg>=0.4
+cmudict>=1.0
+pyinstaller>=6.10
+matplotlib>=3.5
