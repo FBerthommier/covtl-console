@@ -81,17 +81,16 @@ jobs:
 
       - name: Push the smoke log to the ci-logs branch (anonymous readback)
         if: always()
+        continue-on-error: true
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git config user.email 'ci@covtl.local'
-          git config user.name 'covtl-ci'
-          git fetch origin ci-logs 2>/dev/null || true
-          git checkout ci-logs 2>/dev/null || git checkout -b ci-logs
-          mkdir -p logs
-          cp packaging/windows/smoke-run.log logs/windows-${{ github.run_number }}-smoke.log 2>/dev/null || true
-          git add logs
-          git commit -m "smoke log (run ${{ github.run_number }})" || true
-          git push origin ci-logs
+          gh api --method PUT \
+            "repos/FBerthommier/covtl-console/contents/logs/windows-${{ github.run_number }}-smoke.log" \
+            -f message="smoke log (run ${{ github.run_number }})" \
+            -f content="$(base64 -w0 packaging/windows/smoke-run.log)" \
+            --jq .commit.sha
           Remove-Item -Recurse -Force dist\windows\smoke-copy
 
       - name: Package ZIP (hygiene B2)
