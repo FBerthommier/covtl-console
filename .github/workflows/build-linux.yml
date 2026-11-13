@@ -65,6 +65,15 @@ jobs:
             echo "::error title=rebuild-log part $n::$msg"
           done
 
+      - name: Publish result sha256 (annotations)
+        if: success()
+        working-directory: packaging/linux
+        shell: bash
+        run: |
+          sha=$(sha256sum releases/COVTL-Console-Linux-x64.zip | cut -d' ' -f1)
+          size=$(stat -c%s releases/COVTL-Console-Linux-x64.zip)
+          echo "::notice title=Linux ZIP::sha256=$sha size=$size octets"
+
       - name: Empreintes et tailles
         working-directory: packaging/linux
         run: |
