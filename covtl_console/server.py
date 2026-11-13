@@ -1631,6 +1631,11 @@ def _synth_pool():
         if _SYNTH_POOL is None:
             try:
                 from concurrent.futures import ProcessPoolExecutor
+                # [XFIX] the job handler below references BrokenProcessPool:
+                # the name must be importable here regardless of the code
+                # path (3.1.4 shipped without it - latent NameError on the
+                # first worker death, found by the Linux portage chain).
+                from concurrent.futures.process import BrokenProcessPool
                 _SYNTH_POOL = ProcessPoolExecutor(max_workers=1)
             except Exception:
                 _SYNTH_POOL_BROKEN = True
