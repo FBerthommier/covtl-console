@@ -70,8 +70,11 @@ jobs:
         run: |
           $env:BROWSER = ''
           Copy-Item -Recurse -Force dist\windows\covtl-console dist\windows\smoke-copy
-          python packaging/windows/standalone_smoke.py dist\windows\smoke-copy\covtl-console.exe
-          if ($LASTEXITCODE -ne 0) { throw "smoke failed (rc=$LASTEXITCODE)" }
+          python packaging/windows/standalone_smoke.py dist\windows\smoke-copy\covtl-console.exe 2>&1 | Tee-Object -FilePath smoke-run.log
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content smoke-run.log -Tail 25 | ForEach-Object { Write-Host "::error::$_" }
+            throw "smoke failed (rc=$LASTEXITCODE)"
+          }
           Remove-Item -Recurse -Force dist\windows\smoke-copy
 
       - name: Package ZIP (hygiene B2)
