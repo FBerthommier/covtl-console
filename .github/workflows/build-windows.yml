@@ -44,12 +44,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies (PyPI) + covtl-console pinned (TestPyPI, --no-deps)
+      - name: Install dependencies (PyPI) + covtl chain pinned (TestPyPI, --no-deps)
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           python -m pip install fastapi uvicorn numpy scipy Pillow imageio-ffmpeg cmudict matplotlib pyinstaller
-          python -m pip install --index-url https://test.pypi.org/simple/ --no-deps "covtl-console==${{ inputs.version || '3.1.5' }}"
+          # pins = the current coherent TestPyPI chain; bump these three
+          # lines together when publishing the next versions
+          python -m pip install --index-url https://test.pypi.org/simple/ --no-deps "covtl-console==${{ inputs.version || '3.1.5' }}" "vtl-synth==1.1.2" "covtl-sandhi==0.1.0"
 
       - name: pip check
         shell: pwsh
