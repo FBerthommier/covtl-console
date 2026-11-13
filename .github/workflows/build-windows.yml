@@ -72,8 +72,11 @@ jobs:
           Copy-Item -Recurse -Force dist\windows\covtl-console dist\windows\smoke-copy
           python packaging/windows/standalone_smoke.py dist\windows\smoke-copy\covtl-console.exe 2>&1 | Tee-Object -FilePath smoke-run.log
           if ($LASTEXITCODE -ne 0) {
-            Get-Content smoke-run.log -Tail 25 | ForEach-Object { Write-Host "::error::$_" }
-            throw "smoke failed (rc=$LASTEXITCODE)"
+            "## Smoke failed (rc=$LASTEXITCODE) — last 40 log lines" | Add-Content $env:GITHUB_STEP_SUMMARY
+            '```' | Add-Content $env:GITHUB_STEP_SUMMARY
+            Get-Content smoke-run.log -Tail 40 | ForEach-Object { '   ' + $_ | Add-Content $env:GITHUB_STEP_SUMMARY }
+            '```' | Add-Content $env:GITHUB_STEP_SUMMARY
+            throw "smoke failed (rc=$LASTEXITCODE) - see the run summary for the smoke log tail"
           }
           Remove-Item -Recurse -Force dist\windows\smoke-copy
 
