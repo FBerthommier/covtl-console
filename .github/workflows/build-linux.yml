@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: 2026 Frédéric Berthommier
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Workflow GitHub Actions — rebuild du standalone Linux x64.
+#
+# Exécute la chaîne packaging/linux (venv 2 phases, patch C1, build
+# onedir, smoke avec contrôle MP4 — matplotlib porté —, porte d'hygiène
+# B2) sur un runner ubuntu-latest, et publie le ZIP en artifact.
+#
+# Déclenchement : manuel (workflow_dispatch) ou push touchant la chaîne.
+
+name: build-linux-x64
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/linux/**'
+      - '.github/workflows/build-linux.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Standalone Linux x64 (PyInstaller onedir)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build + smoke (chaîne packaging/linux)
+        working-directory: packaging/linux
+        env:
+          RUN_SMOKE: '1'
+        run: bash rebuild.sh
+
+      - name: Empreintes et tailles
+        working-directory: packaging/linux
+        run: |
+          ls -l releases/
+          sha256sum releases/COVTL-Console-Linux-x64.zip
+          du -sm dist/linux/covtl-console
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: COVTL-Console-Linux-x64
+          path: |
+            packaging/linux/releases/COVTL-Console-Linux-x64.zip
+            packaging/linux/validation/SHA256SUMS.txt
+          retention-days: 30
+          if-no-files-found: error
