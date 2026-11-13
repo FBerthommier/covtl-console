@@ -36,6 +36,16 @@ import urllib.request
 import wave
 from pathlib import Path
 
+# CI runners redirect stdout as cp1252: the banner's box-drawing
+# characters would raise UnicodeEncodeError before the smoke even
+# starts. Same guard class as the frozen launcher's 'X utf8' option.
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
+        pass
+
 APP = Path(sys.argv[1]).resolve()
 RESULTS: list[tuple[str, bool, str]] = []
 
