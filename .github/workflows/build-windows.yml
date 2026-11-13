@@ -78,6 +78,20 @@ jobs:
             '```' | Add-Content $env:GITHUB_STEP_SUMMARY
             throw "smoke failed (rc=$LASTEXITCODE) - see the run summary for the smoke log tail"
           }
+
+      - name: Push the smoke log to the ci-logs branch (anonymous readback)
+        if: always()
+        shell: bash
+        run: |
+          git config user.email 'ci@covtl.local'
+          git config user.name 'covtl-ci'
+          git fetch origin ci-logs 2>/dev/null || true
+          git checkout ci-logs 2>/dev/null || git checkout -b ci-logs
+          mkdir -p logs
+          cp packaging/windows/smoke-run.log logs/windows-${{ github.run_number }}-smoke.log 2>/dev/null || true
+          git add logs
+          git commit -m "smoke log (run ${{ github.run_number }})" || true
+          git push origin ci-logs
           Remove-Item -Recurse -Force dist\windows\smoke-copy
 
       - name: Package ZIP (hygiene B2)
