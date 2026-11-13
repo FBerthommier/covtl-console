@@ -78,7 +78,7 @@ if [ "$STATEV" != "done" ]; then
     echo "ÉCHEC : vidéo polar non terminée en 240 s (dernier état: $STATEV)"
     exit 1
 fi
-MP4=$(find "$WORK/outv" -name "*.mp4" -print -quit)
+MP4=$(find "$WORK/out" -path "*outv*" -name "*.mp4" -print -quit)
 if [ -z "$MP4" ]; then
     echo "ÉCHEC : MP4 introuvable (modes vidéo indisponibles dans ce bundle ?)"
     exit 1
