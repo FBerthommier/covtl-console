@@ -51,6 +51,20 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Publish error tail (annotations)
+        if: failure()
+        working-directory: packaging/linux
+        shell: bash
+        run: |
+          tail -n 45 rebuild-run.log | sed 's/%/%25/g' > /tmp/tail.txt
+          split -l 5 -d /tmp/tail.txt /tmp/chunk_
+          n=0
+          for f in /tmp/chunk_*; do
+            n=$((n+1))
+            msg=$(sed ':a;N;$!ba;s/\n/%0A/g' "$f")
+            echo "::error title=rebuild-log part $n::$msg"
+          done
+
       - name: Empreintes et tailles
         working-directory: packaging/linux
         run: |
