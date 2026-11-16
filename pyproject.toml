@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "covtl-console"
-version = "3.1.5"
+version = "3.1.7"
 description = "COVTL Lab Console — local web interface for covtl-pipeline (G2P preview, SAMPA guard, syllable compiler, continuous polar display)"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -40,7 +40,7 @@ dependencies = [
     # Published versions since 3.1.1 (was: Git URLs). The pinned chain is
     # what TestPyPI serves; the packaging copy no longer needs its own
     # dependency adaptation.
-    "vtl-synth==1.1.2",
+    "vtl-synth==1.2.0",
     "covtl-sandhi==0.1.1",
     "fastapi>=0.100",
     "uvicorn>=0.20",

@@ -34,6 +34,7 @@ const state = {
   timings: { ...LANGUAGES.en.timings },
   customTimings: false,
   expressive: false,
+  phonation: 'normal',        // whole-phrase phonation mode (engine >= 1.2.0)
   sandhi: 'standard',         // cross-word sandhi level (covtl-sandhi rules)
   sandhiMode: 'g2p',
   engine: 'syl',
@@ -199,6 +200,7 @@ function saveSettings() {
     f0: state.f0Edited ? state.f0 : null,
     timings: state.customTimings ? state.timings : null,
     expressive: state.expressive, engine: state.engine, ortho: state.ortho,
+    phonation: state.phonation,
     sandhi: state.sandhi, sandhiMode: state.sandhiMode,
     guardPolicy: state.guardPolicy, outputMode: state.outputMode,
     displayPolar: state.displayPolar, displaySpec: state.displaySpec,
@@ -216,7 +218,7 @@ function loadSettings() {
     if (s.speaker) state.speaker = s.speaker;
     if (s.f0) { state.f0 = s.f0; state.f0Edited = true; }
     if (s.timings) { state.timings = s.timings; state.customTimings = true; }
-    for (const k of ['expressive', 'engine', 'ortho', 'outputMode', 'displayPolar', 'displaySpec', 'exports', 'outDir', 'outLabel', 'sandhi', 'sandhiMode']) {
+    for (const k of ['expressive', 'engine', 'ortho', 'outputMode', 'displayPolar', 'displaySpec', 'exports', 'outDir', 'outLabel', 'sandhi', 'sandhiMode', 'phonation']) {
       if (s[k] !== undefined && s[k] !== null) state[k] = s[k];
     }
     if (s.guardPolicy) state.guardPolicy = s.guardPolicy;
@@ -327,6 +329,12 @@ function bindControls() {
     $('#breath-ms').textContent = state.expressive ? '≈130 ms' : '— (expressive off)';
     saveSettings();
     convert();
+  });
+  $('#sel-phonation').addEventListener('change', (e) => {
+    state.phonation = e.target.value;
+    saveSettings();
+    // no convert(): the phonation mode does NOT change the SAMPA
+    // string — it rides the glottal layer at synthesis time only
   });
   $('#sel-sandhi').addEventListener('change', (e) => {
     state.sandhi = e.target.value;
@@ -962,6 +970,7 @@ function synthPayload(source) {
     outputMode: state.outputMode, guardPolicy: state.guardPolicy,
     outputDir: state.outDir, label: state.outLabel || null,
     exports: state.exports,
+    phonation: state.phonation,
     sandhi: state.sandhi, sandhiMode: state.sandhiMode,
     _via: via,
     _src: info.which,

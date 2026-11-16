@@ -166,6 +166,14 @@ hiddenimports = [
     # observé au smoke test. On collecte tout le package.
 ]
 hiddenimports += collect_submodules("sandhi")
+# vtl_synth.utils.sandhi (wave-4 fix, reported to the repo by wave 5):
+# the engine's Branch B loads its language modules dynamically
+# (importlib.import_module(f'.{code}', __name__) in get_module) —
+# invisible to static analysis. Without this, the frozen Windows
+# bundle carried base.py/__init__.py only and every sandhi level
+# silently degraded to off (found on the wave-4 standalone build;
+# the Linux spec already collects the whole vtl_synth package).
+hiddenimports += collect_submodules("vtl_synth.utils.sandhi")
 # vocaltractlab_cython : le module d'extension Cython importe ses
 # sous-modules (utils, exceptions) EN RUNTIME via l'API C Python —
 # invisible à l'analyse statique (constaté au build de validation :
