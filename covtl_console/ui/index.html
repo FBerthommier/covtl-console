@@ -149,11 +149,22 @@
             <option value="post">post — SAMPA post-processor</option>
             <option value="pre">pre — orthographic rewrite</option>
           </select></label>
+        <label class="field"><span>Phonation mode <kbd class="mini">tag_overrides</kbd></span>
+          <select id="sel-phonation">
+            <option value="normal" selected>normal — modal voicing</option>
+            <option value="breathy">breathy — open glottal chink</option>
+            <option value="creaky">creaky — double pulsing</option>
+            <option value="whisper">whisper — full glottal opening</option>
+          </select></label>
         <dl class="info-list">
           <dt>Breath pause “%”</dt><dd id="breath-ms" class="mono">— (expressive off)</dd>
         </dl>
         <p class="hint">Expressive: breathing groups and an F0 contour (declination, re-attacks,
           pitch accents) — touches only the glottis f0 column and pause durations.</p>
+        <p class="hint" id="phonation-note">Phonation (engine ≥ 1.2.0): breathy / creaky / whisper
+          applied to the whole phrase via the engine's wildcard tag override
+          (<span class="mono">Pipeline(tag_overrides={'*': …})</span>). Per-vowel control stays a
+          Python-API feature.</p>
         <p class="hint" id="sandhi-note">Cross-word sandhi = liaison (fr <span class="mono">faut il → fo.til</span>,
           en <span class="mono">a apple → @.na.p@l</span>, it raddoppiamento, es enlace, pt encadeamento,
           de Glottalversatz). Default <span class="mono">standard</span>. The rules live in the

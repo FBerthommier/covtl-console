@@ -861,6 +861,7 @@ class SynthRequest(BaseModel):
     lang: str = "en"
     speaker: str = "jd3"
     expressive: bool = False
+    phonation: str = "normal"            # normal | breathy | creaky | whisper
     f0: Optional[float] = None
     timings: Dict[str, float] = {}
     engine: str = "syl"
@@ -964,6 +965,7 @@ def synth_key(req: SynthRequest) -> str:
         "f0": req.f0, "timings": {k: req.timings.get(k) for k in
                                   ("tcons", "tvoy", "tpause", "tpauseLong")},
         "engine": req.engine, "ortho": req.ortho, "outputMode": req.outputMode,
+        "phonation": str(getattr(req, "phonation", "normal") or "normal").lower(),
         "exports": req.exports,
         "label": req.label, "outputDir": req.outputDir,
         "sandhi": str(req.sandhi or "off").lower(),
@@ -1514,8 +1516,10 @@ def synthesize(req: SynthRequest) -> Dict[str, Any]:
     t = _timings_of(req.lang, req.timings)
     sandhi_level = str(req.sandhi or "off").lower()
     sandhi_mode = str(req.sandhi_mode or "g2p").lower()
+    _phon_echo = str(getattr(req, "phonation", "normal") or "normal").lower()
     echo = {"lang": req.lang, "speaker": req.speaker, "engine": req.engine,
-            "ortho": req.ortho, "expressive": req.expressive, "guard": req.guardPolicy or "warn",
+            "ortho": req.ortho, "expressive": req.expressive,
+            "phonation": _phon_echo, "guard": req.guardPolicy or "warn",
             "tcons": t["tcons"], "tvoy": t["tvoy"], "tpause": t["tpause"],
             "tpause_long": t["tpauseLong"], "engine_version": ENGINE_VERSION,
             "sandhi": sandhi_level, "sandhi_mode": sandhi_mode}
@@ -1730,6 +1734,18 @@ def _worker(job_id: str, req: SynthRequest,
             kwargs["sandhi"] = str(req.sandhi).lower()
         if "sandhi_mode" in sig and str(getattr(req, "sandhi_mode", "g2p") or "g2p").lower() != "g2p":
             kwargs["sandhi_mode"] = str(req.sandhi_mode).lower()
+        # Phonation modes (wave 5, engine >= 1.2.0): one wildcard entry
+        # drives the whole phrase — the '*' key needs the wave-5
+        # engine; per-key dicts also work on plain 1.2.0. Rejected
+        # values degrade to the default mode with a job note, not an
+        # engine error.
+        _phon = str(getattr(req, "phonation", "normal") or "normal").lower()
+        if "tag_overrides" in sig and _phon not in ("", "normal", "none"):
+            if _phon in ("breathy", "creaky", "whisper"):
+                kwargs["tag_overrides"] = {"*": {"voicing": _phon}}
+            else:
+                job.setdefault("notes", []).append(
+                    f"unknown phonation mode {_phon!r} — ignored (normal kept)")
         t = _timings_of(req.lang, req.timings)
         if "t_cons_ms" in sig: kwargs["t_cons_ms"] = t["tcons"]
         if "t_voy_ms" in sig: kwargs["t_voy_ms"] = t["tvoy"]
