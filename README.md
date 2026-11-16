@@ -360,6 +360,12 @@ another speaker with a non-English language triggers the console's
   audit chain re-executed at the frozen versions: **37/37 checks conform**
   (2026-10-29); complements COVCONF-D11-511cf2e. See
   [docs/certificates/](docs/certificates/).
+- **Polar display equivalence attestation** — the console's HTML polar
+  display vs the pipeline's reference polar plot: parameter ν, its arc
+  concavities, and the absence of any inversion, verified by code audit
+  and numerical simulations over six phrases. **Equivalence attested**
+  (ν respected, zero inversion; max deviation 1.1×10⁻⁴ cm, 2026-11-15):
+  [docs/certificates/Polar_Display_Equivalence_Certificate.pdf](docs/certificates/Polar_Display_Equivalence_Certificate.pdf)
 
 ## Testing
 
