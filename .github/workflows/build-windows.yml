@@ -51,7 +51,7 @@ jobs:
           python -m pip install fastapi uvicorn numpy scipy Pillow imageio-ffmpeg cmudict vocaltractlab-cython matplotlib pyinstaller
           # pins = the current coherent TestPyPI chain; bump these three
           # lines together when publishing the next versions
-          python -m pip install --index-url https://test.pypi.org/simple/ --no-deps "covtl-console==${{ inputs.version || '3.1.9' }}" "covtl-synth==1.2.1" "covtl-sandhi==0.1.1"
+          python -m pip install --index-url https://test.pypi.org/simple/ --no-deps "covtl-console==${{ inputs.version || '3.1.10' }}" "covtl-synth==1.2.2" "covtl-sandhi==0.1.1"
 
       - name: pip check
         shell: pwsh
