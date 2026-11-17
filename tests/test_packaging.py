@@ -32,7 +32,7 @@ def test_pyproject_declares_flash_install():
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(
         encoding="utf-8"))
     deps = " ".join(data["project"]["dependencies"])
-    assert "covtl-synth==1.2.1" in deps
+    assert "covtl-synth==1.2.2" in deps
     assert "covtl-sandhi==0.1.1" in deps
     scripts = data["project"]["scripts"]
     assert scripts.get("covtl-console") == "covtl_console.server:main"
