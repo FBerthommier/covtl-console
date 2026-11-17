@@ -26,8 +26,8 @@ python3 -m venv .venv-build
 echo "==> [2/6] Phase 1 — dépendances réelles (PyPI)"
 .venv-build/bin/pip install --quiet -r build/requirements-build.txt
 
-echo "==> [3/6] Phase 2 — chaîne covtl (TestPyPI)"
-.venv-build/bin/pip install --quiet --index-url https://test.pypi.org/simple/ "covtl-console==3.1.10"
+echo "==> [3/6] Phase 2 — chaîne covtl (PyPI)"
+.venv-build/bin/pip install --quiet "covtl-console==3.1.10"
 .venv-build/bin/pip check
 .venv-build/bin/pip freeze > build/requirements-freeze-run.txt
 
