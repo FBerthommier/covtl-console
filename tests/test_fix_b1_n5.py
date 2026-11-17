@@ -165,7 +165,7 @@ def test_engine_version_falls_back_to_module_attribute(monkeypatch):
     # restored state: dist-info when pip-installed, module attribute when
     # the engine is only importable (e.g. a PYTHONPATH checkout).
     try:
-        expected = importlib.metadata.version("vtl-synth")
+        expected = importlib.metadata.version("covtl-synth")
     except importlib.metadata.PackageNotFoundError:
         expected = vtl_synth.__version__
     assert S.LIVE and S.ENGINE_VERSION == expected

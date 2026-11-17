@@ -223,7 +223,7 @@ def main() -> int:
         log(tail)
         if r.returncode != 0:
             fail("pip install of the wheel failed (see log above)")
-        for needle in ("vtl-synth", "covtl-sandhi", "covtl-console",
+        for needle in ("covtl-synth", "covtl-sandhi", "covtl-console",
                        "fastapi", "uvicorn"):
             check(needle in (r.stdout or ""),
                   f"pip resolved {needle} from the wheel metadata")

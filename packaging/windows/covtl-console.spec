@@ -93,7 +93,7 @@ datas += copy_metadata("cmudict")
 # amont (vtl_synth.__version__) couvre déjà engine_version, mais ces
 # dist-info rendent la version exacte dans tous les cas (UI : « engine
 # v1.1.0 », bridge = version du paquet).
-datas += copy_metadata("vtl-synth")
+datas += copy_metadata("covtl-synth")
 datas += copy_metadata("covtl-console")
 
 # imageio-ffmpeg : le binaire ffmpeg embarqué par le wheel
@@ -130,7 +130,7 @@ def _dist_info_dir(dist):
     return None
 
 
-for _name in ("vtl-synth", "covtl-console", "covtl-sandhi", "cmudict",
+for _name in ("covtl-synth", "covtl-console", "covtl-sandhi", "cmudict",
               "imageio-ffmpeg", "vocaltractlab-cython"):
     try:
         _dist = _imd.distribution(_name)

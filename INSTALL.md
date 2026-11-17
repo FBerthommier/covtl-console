@@ -34,11 +34,11 @@ python -m venv .venv
 
 # 1) the COVTL chain from TestPyPI, no dependency resolution
 pip install --index-url https://test.pypi.org/simple/ --no-deps \
-    covtl-console==3.1.6 vtl-synth==1.1.3 covtl-sandhi==0.1.1
+    covtl-console==3.1.9 covtl-synth==1.2.1 covtl-sandhi==0.1.1
 
 # 2) external dependencies from the regular PyPI (the COVTL packages
 #    are already satisfied and are not re-downloaded)
-pip install --index-url https://pypi.org/simple/ covtl-console==3.1.6
+pip install --index-url https://pypi.org/simple/ covtl-console==3.1.9
 
 # 3) optional — video modes (polar/sagittal MP4) need matplotlib
 pip install --index-url https://pypi.org/simple/ matplotlib
@@ -46,7 +46,7 @@ pip install --index-url https://pypi.org/simple/ matplotlib
 covtl-console
 ```
 
-The engine (VocalTractLab binaries ship inside the `vtl-synth` wheel)
+The engine (VocalTractLab binaries ship inside the `covtl-synth` wheel)
 and the covtl-sandhi liaison rules are already part of the chain —
 nothing else to install.
 
