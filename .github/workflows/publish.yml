@@ -9,7 +9,7 @@
 # order guaranteed): stamp a PEP 440 test version (upstream + "." + suffix,
 # e.g. 3.1.0 -> 3.1.0.dev1 — TestPyPI forbids re-uploading a version, the
 # dev suffix avoids collisions; re-run with a fresh suffix instead of
-# overwriting), build, publish covtl-sandhi, then vtl-synth, then
+# overwriting), build, publish covtl-sandhi, then covtl-synth, then
 # covtl-console, then install each back from TestPyPI (smoke check).
 #
 # Dependencies: TestPyPI holds NO production dependency, so every pip
@@ -40,7 +40,7 @@ on:
         required: false
         default: "main"
       pipeline_ref:
-        description: "covtl-pipeline (vtl-synth) ref to publish"
+        description: "covtl-pipeline (covtl-synth) ref to publish"
         required: false
         default: "main"
 
@@ -69,7 +69,7 @@ jobs:
           ref: ${{ inputs.sandhi_ref }}
           path: _upstream/covtl-sandhi
 
-      - name: Checkout covtl-pipeline (vtl-synth)
+      - name: Checkout covtl-pipeline (covtl-synth)
         uses: actions/checkout@v4
         with:
           repository: FBerthommier/covtl-pipeline
@@ -96,7 +96,7 @@ jobs:
           genv = os.environ.get("GITHUB_ENV")
           pkgs = [
               ("_upstream/covtl-sandhi/pyproject.toml", "covtl-sandhi", "SANDHI_VERSION"),
-              ("_upstream/covtl-pipeline/pyproject.toml", "vtl-synth", "VTL_VERSION"),
+              ("_upstream/covtl-pipeline/pyproject.toml", "covtl-synth", "CSYNTH_VERSION"),
               ("pyproject.toml", "covtl-console", "CONSOLE_VERSION"),
           ]
           from packaging.version import Version
@@ -123,15 +123,15 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist/covtl-sandhi
 
-      # ── 2/3 — vtl-synth (needs nothing from TestPyPI; deps from real PyPI)
-      - name: Build vtl-synth
-        run: python -m build --outdir dist/vtl-synth _upstream/covtl-pipeline
+      # ── 2/3 — covtl-synth (needs nothing from TestPyPI; deps from real PyPI)
+      - name: Build covtl-synth
+        run: python -m build --outdir dist/covtl-synth _upstream/covtl-pipeline
 
-      - name: Publish vtl-synth to TestPyPI
+      - name: Publish covtl-synth to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
-          packages-dir: dist/vtl-synth
+          packages-dir: dist/covtl-synth
 
       # ── 3/3 — covtl-console ────────────────────────────────────────
       - name: Build covtl-console
@@ -150,11 +150,11 @@ jobs:
           /tmp/smoke-upstream/bin/pip install \
             --index-url https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple/ \
-            "covtl-sandhi==${SANDHI_VERSION}" "vtl-synth==${VTL_VERSION}"
+            "covtl-sandhi==${SANDHI_VERSION}" "covtl-synth==${CSYNTH_VERSION}"
           /tmp/smoke-upstream/bin/python - <<'EOF'
           import importlib.metadata as md
           assert md.version("covtl-sandhi") == __import__("os").environ["SANDHI_VERSION"]
-          assert md.version("vtl-synth") == __import__("os").environ["VTL_VERSION"]
+          assert md.version("covtl-synth") == __import__("os").environ["CSYNTH_VERSION"]
           import covtl_sandhi, vtl_synth
           print("upstream wheels import cleanly from TestPyPI")
           EOF

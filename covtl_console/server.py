@@ -90,9 +90,9 @@ try:
     LIVE = True
     try:
         from importlib.metadata import version as _pkg_version
-        ENGINE_VERSION = _pkg_version("vtl-synth")
+        ENGINE_VERSION = _pkg_version("covtl-synth")
     except Exception:
-        # Frozen bundles (PyInstaller) carry no vtl-synth dist-info, so
+        # Frozen bundles (PyInstaller) carry no covtl-synth dist-info, so
         # importlib.metadata cannot resolve it — the UI then showed
         # 'engine vinstalled' (audit N5). Fall back to the engine's own
         # __version__; 'installed' remains the last resort.
