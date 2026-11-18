@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: 2026 Frédéric Berthommier
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Production PyPI publication via Trusted Publishing (OIDC, no token).
+#
+# publish-prod.yml is the workflow registered as a GitHub Actions trusted
+# publisher on TWO PyPI projects:
+#   - covtl-console  (built from the repository root)
+#   - covtl          (meta-package, built from meta/)
+#
+# MANUAL ONLY (workflow_dispatch): nothing ships without an explicit
+# owner gesture. Bump the versions in pyproject.toml (root) and meta/
+# pyproject.toml BEFORE dispatching; the build publishes exactly what is
+# committed. Requires the GitHub repository environment "pypi" (created
+# automatically on first run) and the publisher registered on PyPI:
+#   owner FBerthommier / repository covtl-console /
+#   workflow publish-prod.yml / environment pypi
+# (register once per project in the project's Publishing settings).
+
+name: publish-prod
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish covtl-console + covtl (meta) to PyPI (trusted publishing)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: python -m pip install --upgrade build twine
+
+      - name: Build covtl-console (sdist + wheel)
+        run: python -m build --outdir dist-console
+
+      - name: Build covtl meta-package (sdist + wheel)
+        run: python -m build --outdir dist-meta meta/
+
+      - name: Twine check
+        run: |
+          python -m twine check dist-console/*
+          python -m twine check dist-meta/*
+          ls -l dist-console dist-meta
+
+      - name: Upload covtl-console to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-console
+
+      - name: Upload covtl (meta) to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-meta
