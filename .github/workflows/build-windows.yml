@@ -31,6 +31,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   windows:
@@ -125,6 +127,11 @@ jobs:
             --notes "Automated build (PyInstaller onedir, Python 3.12, smoke on a copy with synthesis + polar MP4). ASCII %TEMP% staging for non-ASCII install paths; Linux twin: release linux-standalone. sha256: $sha" `
             --latest `
             COVTL-Console-Windows-x64.zip#COVTL-Console-Windows-x64.zip
+
+      - name: Attest build provenance (Sigstore)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: COVTL-Console-Windows-x64.zip
 
       - uses: actions/upload-artifact@v4
         if: always()

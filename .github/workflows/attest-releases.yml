@@ -1,0 +1,94 @@
+# SPDX-FileCopyrightText: 2026 Frédéric Berthommier
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Workflow GitHub Actions — attestations Sigstore des artefacts PUBLIÉS.
+#
+# attest-releases.yml télécharge chaque asset depuis sa release publique
+# (windows-standalone / linux-standalone / macos-standalone) et génère une
+# attestation de provenance signée Sigstore sur les octets exacts servis au
+# téléchargement — sans rebuild, donc sans changer les empreintes publiées
+# (les SHA-256 affichés sur covtl.org restent valides).
+#
+# Pour les jumeaux Windows/Linux construits par CI, l'attestation est aussi
+# générée automatiquement à la fin de build-windows.yml / build-linux.yml ;
+# ce dispatch couvre les builds déjà publiés AVANT l'ajout de ces étapes.
+# Le zip macOS est un build externe (python-build-standalone, arm64) :
+# l'attestation atteste ici le fichier publié, pas une chaîne CI macOS —
+# le prédicat reflète ce workflow de re-attestation.
+#
+# Vérification côté utilisateur (gh >= 2.46) :
+#   gh attestation verify COVTL-Console-Windows-x64.zip -R FBerthommier/covtl-console
+#   gh attestation verify COVTL-Console-Linux-x64.zip    -R FBerthommier/covtl-console
+#   gh attestation verify COVTL-Console-macOS.zip        -R FBerthommier/covtl-console
+
+name: attest-releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: 'Targets among windows,linux,macos (comma-separated)'
+        required: false
+        default: 'windows,linux,macos'
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  windows:
+    name: Attest published windows-standalone asset
+    if: ${{ contains(github.event.inputs.targets || 'windows,linux,macos', 'windows') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download the published asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dl && cd dl
+          gh release download windows-standalone -R "$GITHUB_REPOSITORY" \
+            --pattern 'COVTL-Console-Windows-x64.zip'
+          sha256sum COVTL-Console-Windows-x64.zip
+      - name: Attest build provenance (Sigstore, published artifact)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dl/COVTL-Console-Windows-x64.zip
+
+  linux:
+    name: Attest published linux-standalone asset
+    if: ${{ contains(github.event.inputs.targets || 'windows,linux,macos', 'linux') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download the published asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dl && cd dl
+          gh release download linux-standalone -R "$GITHUB_REPOSITORY" \
+            --pattern 'COVTL-Console-Linux-x64.zip'
+          sha256sum COVTL-Console-Linux-x64.zip
+      - name: Attest build provenance (Sigstore, published artifact)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dl/COVTL-Console-Linux-x64.zip
+
+  macos:
+    name: Attest published macos-standalone asset
+    if: ${{ contains(github.event.inputs.targets || 'windows,linux,macos', 'macos') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download the published asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dl && cd dl
+          gh release download macos-standalone -R "$GITHUB_REPOSITORY" \
+            --pattern 'COVTL-Console-macOS.zip'
+          sha256sum COVTL-Console-macOS.zip
+      - name: Attest build provenance (Sigstore, published artifact)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dl/COVTL-Console-macOS.zip
