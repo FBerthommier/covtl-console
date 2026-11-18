@@ -1,6 +1,7 @@
-<!-- COVTL Console — one-page brief · QR target for covtl.org
-     Source facts: covtl.org (2026-11-17), FBerthommier/covtl-console README
-     & INSTALL.md, lab validation report 2026-11-17. En-US. -->
+<!-- COVTL Console — generic one-page brief · hub for the platform briefs
+     (brief-windows.md / brief-linux.md / brief-macos.md). En-US.
+     Source facts: covtl.org (2026-11-17/18), FBerthommier/covtl-console
+     README & INSTALL.md, lab validation report 2026-11-17. -->
 
 # The COVTL Console — speech you can *watch* taking shape 🎙️
 
@@ -26,23 +27,33 @@ prosody · breathy / creaky / whisper · liaison & sandhi · polar display.**
 3. **Synthesize** `S` — play it, scrub anchor by anchor, read the
    spectrogram, watch the polar display, download WAV & MP4.
 
-## Before you download
+## Choose your installation path
 
-- **No Python needed:** unzip and run — Windows 10/11 x64 (~122 MB) or
-  Linux x64 (~192 MB) — your browser opens on `http://127.0.0.1:8421`.
-  Python 3.9+? One command: `pip install covtl`.
+| Your machine | Go to | Bundle |
+|---|---|---|
+| Windows 10/11 · x64 | [Windows brief](brief-windows.md) | zip ~122 MB, no Python needed |
+| Linux · x64 | [Linux brief](brief-linux.md) | zip ~192 MB, no Python needed |
+| macOS · Apple Silicon (M1-M4, macOS 11+) | [macOS brief](brief-macos.md) | zip ~98 MB, no Python needed (unsigned: right-click > Open) |
+| Any OS with Python 3.9+ | **one command: `pip install covtl`** | pulls the whole suite: covtl-console (web UI) + covtl-synth (engine) + covtl-sandhi (rules). Then `covtl-console` opens the same interface on http://127.0.0.1:8421, or synthesize from the CLI: `vtl-synth run "this is easy for us" -o out` |
+
+The standalone bundles open the exact same web interface — unzip, run,
+no Python required. Full downloads on the
+[releases page](https://github.com/FBerthommier/covtl-console/releases).
+
+## Before you trust any link or QR
+
 - **Local only:** the console talks to `127.0.0.1` and nothing else.
 - **After you scan, read the address bar.** The only real pages live on
   `github.com/FBerthommier/…` — a lookalike domain or a sticker slapped
   over a printed QR is a classic trick ([FBI IC3
   alert](https://www.ic3.gov/PSA/2022/PSA220118)). When in doubt, type
   the address yourself.
-- **Trust, but verify:** check your bundle's SHA-256 on the [releases
-  page](https://github.com/FBerthommier/covtl-console/releases) — the
-  real integrity proof, beyond any QR code or link.
+- **Trust, but verify:** check your bundle's SHA-256 (values on
+  [covtl.org](https://covtl.org) and in each platform brief) and the
+  Sigstore build provenance:
+  `gh attestation verify <zip> -R FBerthommier/covtl-console`.
 
-**Next stop:** [download](https://github.com/FBerthommier/covtl-console/releases) ·
-[user manual & docs](https://github.com/FBerthommier/covtl-console/tree/main/docs) ·
+**Next stop:** [user manual & docs](https://github.com/FBerthommier/covtl-console/tree/main/docs) ·
 [source](https://github.com/FBerthommier/covtl-console)
 
 *GPL-3.0-or-later · built on VocalTractLab · © Frédéric Berthommier — cite arXiv:2307.02299.*
