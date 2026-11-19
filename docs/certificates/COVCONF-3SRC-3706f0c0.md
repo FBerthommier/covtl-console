@@ -144,7 +144,7 @@ The console **covtl-console** (frozen at `3706f0c0` in the audit) is modified ne
 
 **Deposit.** This certificate is deposited in the covtl-console documentation as the conformity record of the three-source comparison underlying its data source. Placement and integration:
 
-- Files: `docs/certificates/COVCONF-3SRC-3706f0c0.md` (this document), the formal PDF edition `COVCONF-3SRC-3706f0c0.pdf`, and the machine record `covconf-3src-verification.json`; the predecessor certificate COVCONF-D11-511cf2e (`.md`, `.pdf`, and its machine record) is deposited alongside so that all cross-references resolve within the repository.
+- Files: `docs/certificates/COVCONF-3SRC-3706f0c0.md` (this document) and the formal PDF edition `COVCONF-3SRC-3706f0c0.pdf`. **Deposit status (2026-11-18): the machine record `covconf-3src-verification.json` and the predecessor certificate COVCONF-D11-511cf2e (`.md`, `.pdf`, and its machine record) are not deposited yet — pending from the certifier**; the cross-references to them resolve only once those files are added to `docs/certificates/`.
 - Documentation pointer (console README): *"Three-source conformity certificate COVCONF-3SRC-3706f0c0 — re-executed audit chain (arXiv:2307.02299 / covtl-pipeline / covtl-console), 37/37 checks conform (2026-10-29); complements COVCONF-D11-511cf2e."*
 - Suggested commit message: `docs(console): deposit conformity certificates COVCONF-3SRC-3706f0c0 and COVCONF-D11-511cf2e (37/37 + 31/31 checks conform)`.
 
@@ -221,4 +221,4 @@ python3 scripts/covconf3_verify.py       # 37 checks, 37 conform, 0 divergent
 
 **Commit identifiers.** Paper: arXiv:2307.02299v1 (2023-07-05). Reference implementation: big.bi-supplement @ `c83ace3a`. Engine audited baseline: `48442aa904315d1d8452531da91a14a19c68afd6` (`48442aa9`). Engine remediated: `511cf2ed62d1a11aa3876c172bda2b3d6494d351` (`511cf2e`, branch `main`, 2026-10-29). Console (depository): `3706f0c0dbc8cc07b1309954ba172f4c49535e38` (`3706f0c0`).
 
-**Cross-references.** COVCONF-D11-511cf2e (2026-10-29) — D-11 remediation certificate, 31 checks, 0 divergent; evidence bundle — `d11_fix_evidence_511cf2e.json`; engine module — `vtl_synth/core/syltraj.py` @ covtl-pipeline; certifier — `scripts/covconf3_verify.py`; machine record — `covconf-3src-verification.json` (delivered with this certificate).
+**Cross-references.** COVCONF-D11-511cf2e (2026-10-29) — D-11 remediation certificate, 31 checks, 0 divergent — *not deposited yet (pending from the certifier)*; evidence bundle — `d11_fix_evidence_511cf2e.json`; engine module — `vtl_synth/core/syltraj.py` @ covtl-pipeline; certifier — `scripts/covconf3_verify.py`; machine record — `covconf-3src-verification.json` (delivered with this certificate).

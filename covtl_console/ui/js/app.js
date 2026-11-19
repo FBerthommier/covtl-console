@@ -15,7 +15,7 @@
 import { api, cacheInfo, clearCaches, getApiBase } from './api.js';
 import * as R from './render.js';
 import {
-  LANGUAGES, SPEAKERS, VOWELS, CONSONANTS, EXAMPLES,
+  LANGUAGES, SPEAKERS, VOWELS, CONSONANTS, EXAMPLES, INVENTORY_NOTE,
 } from './data.js';
 import { PolarStage } from './polar.js';
 import { SpectrogramView } from './spectrogram.js';
@@ -397,7 +397,7 @@ function bindControls() {
   });
   $('#btn-inventory').addEventListener('click', () => {
     const pop = $('#inventory-pop');
-    R.renderInventory(null, VOWELS, CONSONANTS);
+    R.renderInventory(null, VOWELS, CONSONANTS, INVENTORY_NOTE);
     pop.style.display = pop.style.display === 'none' ? '' : 'none';
   });
 

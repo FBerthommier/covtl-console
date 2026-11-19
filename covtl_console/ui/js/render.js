@@ -111,11 +111,11 @@ export function renderGuardBanner(rejected, policy, onStrip, onWarnPolicy) {
 }
 
 /* ── inventory popover ──────────────────────────────────────────────── */
-export function renderInventory(digest, vowels, consonants) {
+export function renderInventory(digest, vowels, consonants, inventoryNote) {
   const pop = $('#inventory-pop');
   pop.innerHTML = '';
   const close = el('button', { class: 'pop-close', text: '×', onclick: () => { pop.style.display = 'none'; } });
-  pop.append(el('div', { class: 'pop-title' }, 'Engine inventory — ALL_PHONEME_KEYS', close));
+  pop.append(el('div', { class: 'pop-title' }, 'Console inventory (subset of ALL_PHONEME_KEYS)', close));
   pop.append(el('div', { class: 'pop-sub', text: `vowels (ρ ≤ 1 in the polar plane)${digest?.count ? ` · ${digest.count} symbols total` : ''}` }),
     el('div', { class: 'inv-row' }, vowels.map((v) => el('span', { class: 'tok tok-word mono', text: v }))));
   pop.append(el('div', { class: 'pop-sub', text: 'consonants (closures at ρ 1.0–1.45)' }),
@@ -123,6 +123,7 @@ export function renderInventory(digest, vowels, consonants) {
   pop.append(el('div', { class: 'pop-sub', text: 'markers (engine syntax, never rejected)' }),
     el('div', { class: 'inv-row' }, ['. ␣ | % ~'].map((m) => el('span', { class: 'tok tok-pause mono', text: m }))));
   pop.append(el('div', { class: 'pop-note', text: 'Any other symbol is rejected by the guard and painted red in the final SAMPA. Nasalized vowels (a~, E~, O~, …) are vowel + the “~” nasality marker.' }));
+  if (inventoryNote) pop.append(el('div', { class: 'pop-note', text: inventoryNote }));
 }
 
 /* ── synthesis progress (slim strip under the action bar) ──────────── */

@@ -1122,6 +1122,13 @@ const LANGUAGES = {
 };
 
 /* ── Engine SAMPA inventory (core/constants.py ALL_PHONEME_KEYS) ────── */
+// Inventory note: the engine additionally accepts L (dark l), N (dorsal
+// nasal), C (palatal fricative) and X (uvular fricative, duplicate of R
+// with a longer default duration) — intentionally NOT offered in the
+// console guard; see docs/user-manual (red-reject guard section).
+const INVENTORY_NOTE = 'The engine also accepts L, N, C, X (dark l, '
+  + 'dorsal nasal, palatal, uvular duplicate of R) — intentionally not '
+  + 'offered in the console guard; see the user manual.';
 const VOWELS = ['a', 'e', 'i', 'o', 'u', 'y', 'E', 'O', '@', '2', '6', '9'];
 const CONSONANTS = [
   'p', 'b', 't', 'd', 'k', 'g', 'f', 'v', 's', 'z', 'S', 'Z', 'T', 'D',
@@ -1245,7 +1252,7 @@ const KEYBOARD_SHORTCUTS = [
   { keys: ['?'], action: 'Show this shortcut reference' },
 ];
 
-return { ENGINE: ENGINE, SPEAKERS: SPEAKERS, speakerById: speakerById, LANGUAGES: LANGUAGES, VOWELS: VOWELS, CONSONANTS: CONSONANTS, NASALIZED: NASALIZED, DIPHTHONGS: DIPHTHONGS, TOLERATED_MARKERS: TOLERATED_MARKERS, INVENTORY_KEYS: INVENTORY_KEYS, REJECT_REASON: REJECT_REASON, SAMPA_SUGGESTIONS: SAMPA_SUGGESTIONS, EXAMPLES: EXAMPLES, KEYBOARD_SHORTCUTS: KEYBOARD_SHORTCUTS, isVowel: isVowel, isMarker: isMarker, tokenizeSampa: tokenizeSampa, unknownSymbols: unknownSymbols, suggestFor: suggestFor, enrichRejected: enrichRejected, isSampaToken: isSampaToken };
+return { ENGINE: ENGINE, SPEAKERS: SPEAKERS, speakerById: speakerById, LANGUAGES: LANGUAGES, INVENTORY_NOTE: INVENTORY_NOTE, VOWELS: VOWELS, CONSONANTS: CONSONANTS, NASALIZED: NASALIZED, DIPHTHONGS: DIPHTHONGS, TOLERATED_MARKERS: TOLERATED_MARKERS, INVENTORY_KEYS: INVENTORY_KEYS, REJECT_REASON: REJECT_REASON, SAMPA_SUGGESTIONS: SAMPA_SUGGESTIONS, EXAMPLES: EXAMPLES, KEYBOARD_SHORTCUTS: KEYBOARD_SHORTCUTS, isVowel: isVowel, isMarker: isMarker, tokenizeSampa: tokenizeSampa, unknownSymbols: unknownSymbols, suggestFor: suggestFor, enrichRejected: enrichRejected, isSampaToken: isSampaToken };
 })();
 __mods['render'] = (function () {
 // SPDX-FileCopyrightText: 2026 Frédéric Berthommier
@@ -1361,11 +1368,11 @@ function renderGuardBanner(rejected, policy, onStrip, onWarnPolicy) {
 }
 
 /* ── inventory popover ──────────────────────────────────────────────── */
-function renderInventory(digest, vowels, consonants) {
+function renderInventory(digest, vowels, consonants, inventoryNote) {
   const pop = $('#inventory-pop');
   pop.innerHTML = '';
   const close = el('button', { class: 'pop-close', text: '×', onclick: () => { pop.style.display = 'none'; } });
-  pop.append(el('div', { class: 'pop-title' }, 'Engine inventory — ALL_PHONEME_KEYS', close));
+  pop.append(el('div', { class: 'pop-title' }, 'Console inventory (subset of ALL_PHONEME_KEYS)', close));
   pop.append(el('div', { class: 'pop-sub', text: `vowels (ρ ≤ 1 in the polar plane)${digest?.count ? ` · ${digest.count} symbols total` : ''}` }),
     el('div', { class: 'inv-row' }, vowels.map((v) => el('span', { class: 'tok tok-word mono', text: v }))));
   pop.append(el('div', { class: 'pop-sub', text: 'consonants (closures at ρ 1.0–1.45)' }),
@@ -1373,6 +1380,7 @@ function renderInventory(digest, vowels, consonants) {
   pop.append(el('div', { class: 'pop-sub', text: 'markers (engine syntax, never rejected)' }),
     el('div', { class: 'inv-row' }, ['. ␣ | % ~'].map((m) => el('span', { class: 'tok tok-pause mono', text: m }))));
   pop.append(el('div', { class: 'pop-note', text: 'Any other symbol is rejected by the guard and painted red in the final SAMPA. Nasalized vowels (a~, E~, O~, …) are vowel + the “~” nasality marker.' }));
+  if (inventoryNote) pop.append(el('div', { class: 'pop-note', text: inventoryNote }));
 }
 
 /* ── synthesis progress (slim strip under the action bar) ──────────── */
@@ -3283,7 +3291,7 @@ __mods['app'] = (function () {
  */
 const { api, cacheInfo, clearCaches, getApiBase } = __mods['api'];;
 const R = __mods['render'];;
-const { LANGUAGES, SPEAKERS, VOWELS, CONSONANTS, EXAMPLES } = __mods['data'];;
+const { LANGUAGES, SPEAKERS, VOWELS, CONSONANTS, EXAMPLES, INVENTORY_NOTE } = __mods['data'];;
 const { PolarStage } = __mods['polar'];;
 const { SpectrogramView } = __mods['spectrogram'];;
 const { SyllableCompiler } = __mods['compiler'];;
@@ -3664,7 +3672,7 @@ function bindControls() {
   });
   $('#btn-inventory').addEventListener('click', () => {
     const pop = $('#inventory-pop');
-    R.renderInventory(null, VOWELS, CONSONANTS);
+    R.renderInventory(null, VOWELS, CONSONANTS, INVENTORY_NOTE);
     pop.style.display = pop.style.display === 'none' ? '' : 'none';
   });
 

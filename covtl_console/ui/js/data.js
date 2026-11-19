@@ -90,6 +90,13 @@ export const LANGUAGES = {
 };
 
 /* ── Engine SAMPA inventory (core/constants.py ALL_PHONEME_KEYS) ────── */
+// Inventory note: the engine additionally accepts L (dark l), N (dorsal
+// nasal), C (palatal fricative) and X (uvular fricative, duplicate of R
+// with a longer default duration) — intentionally NOT offered in the
+// console guard; see docs/user-manual (red-reject guard section).
+export const INVENTORY_NOTE = 'The engine also accepts L, N, C, X (dark l, '
+  + 'dorsal nasal, palatal, uvular duplicate of R) — intentionally not '
+  + 'offered in the console guard; see the user manual.';
 export const VOWELS = ['a', 'e', 'i', 'o', 'u', 'y', 'E', 'O', '@', '2', '6', '9'];
 export const CONSONANTS = [
   'p', 'b', 't', 'd', 'k', 'g', 'f', 'v', 's', 'z', 'S', 'Z', 'T', 'D',

@@ -1,3 +1,17 @@
+%% =====================================================================
+%% SPDX-FileCopyrightText: 2026 Frédéric Berthommier
+%% SPDX-License-Identifier: CC-BY-SA-4.0
+%%
+%% This manual is licensed under the Creative Commons Attribution-
+%% ShareAlike 4.0 International license (CC BY-SA 4.0) - see
+%% LICENSE-DOCS.md at the root of this repository.
+%%
+%% VocalTractLab credit: the COVTL chain is built on VocalTractLab 2.4,
+%% written by Peter Birkholz (https://www.vocaltractlab.de , GPLv3).
+%% Wherever this documentation describes vocal-tract synthesis, it
+%% describes results obtained with VocalTractLab 2.4 - this credit must
+%% be kept attached in every derived production.
+%% =====================================================================
 % SPDX-FileCopyrightText: 2026 Frédéric Berthommier
 % SPDX-License-Identifier: GPL-3.0-or-later
 \documentclass[11pt,a4paper]{article}
@@ -15,7 +29,7 @@
 
 \title{COVTL Lab Console --- Technical Reference\\[4pt]\large Bridge API, anchor instrumentation, clocks, caching, extension guide}
 \author{Fr\'ed\'eric Berthommier}
-\date{October 2026 --- console v3 (bridge 3.0.0), engine covtl-pipeline v1.1.0}
+\date{October 2026 --- console v3 (bridge 3.0.0), engine covtl-pipeline v1.1.0\\[0.2em]\footnotesize\textit{(the engine has since evolved to 1.2.2; the console bridge pins \texttt{covtl-synth==1.2.2} --- see the engine CHANGELOG)}}
 
 \begin{document}
 \maketitle
@@ -60,7 +74,11 @@ README. Module map:
 
 \begin{longtable}{p{0.24\linewidth}p{0.70\linewidth}}
 \texttt{data.js} & Engine constants mirrored client-side: inventory,
-suggestion table, per-language examples, keyboard map. \\
+suggestion table, per-language examples, keyboard map. The mirrored
+inventory is the console guard's list
+(\texttt{server.py}: \texttt{p b t d k g f v s z S Z T D tS dZ m n J l
+R j w h} + turned-h); the engine-only keys \texttt{L N C X} are
+deliberately absent (see the user manual, red-reject guard). \\
 \texttt{render.js} & DOM renderers: token strips, guard banner,
 progress, result summary, downloads, examples, history; \texttt{\$},
 \texttt{\$\$}, \texttt{el}, \texttt{toast}, \texttt{log}. \\

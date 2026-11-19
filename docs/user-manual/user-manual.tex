@@ -1,3 +1,17 @@
+%% =====================================================================
+%% SPDX-FileCopyrightText: 2026 Frédéric Berthommier
+%% SPDX-License-Identifier: CC-BY-SA-4.0
+%%
+%% This manual is licensed under the Creative Commons Attribution-
+%% ShareAlike 4.0 International license (CC BY-SA 4.0) - see
+%% LICENSE-DOCS.md at the root of this repository.
+%%
+%% VocalTractLab credit: the COVTL chain is built on VocalTractLab 2.4,
+%% written by Peter Birkholz (https://www.vocaltractlab.de , GPLv3).
+%% Wherever this documentation describes vocal-tract synthesis, it
+%% describes results obtained with VocalTractLab 2.4 - this credit must
+%% be kept attached in every derived production.
+%% =====================================================================
 % SPDX-FileCopyrightText: 2026 Frédéric Berthommier
 % SPDX-License-Identifier: GPL-3.0-or-later
 \documentclass[11pt,a4paper]{article}
@@ -13,7 +27,7 @@
 
 \title{COVTL Lab Console --- User Manual\\[4pt]\large A laboratory bench for articulatory speech synthesis}
 \author{Fr\'ed\'eric Berthommier}
-\date{October 2026 --- console v3, engine covtl-pipeline v1.1.0}
+\date{October 2026 --- console v3, engine covtl-pipeline v1.1.0\\[0.2em]\footnotesize\textit{(the engine has since evolved to 1.2.2; the console bridge pins \texttt{covtl-synth==1.2.2} --- see the engine CHANGELOG)}}
 
 \begin{document}
 \maketitle
@@ -173,7 +187,15 @@ immediately --- the fastest way to hear each language's calibration.
 
 The engine knows a fixed inventory of symbols ( vowels
 \texttt{a e i o u y E O @ 2 6 9} plus nasals, consonants
-\texttt{p b t d k g \ldots}, and the markers above). Anything else --- a
+\texttt{p b t d k g f v s z}
+\texttt{S Z T D tS dZ m n J l}
+\texttt{R j w h}, and the labiodental glide (U+0265,
+\emph{turned h}), and the markers above). Note that the console guard accepts exactly
+this list: the engine additionally accepts \texttt{L} (dark \emph{l}),
+\texttt{N} (dorsal nasal), \texttt{C} (palatal fricative) and
+\texttt{X} (uvular fricative, duplicate of \texttt{R} with a longer
+default duration) --- they are intentionally \emph{not} offered in the
+console guard; type them only via the engine CLI. Anything else --- a
 stray \texttt{c}, an IPA \emph{esh} (\texttt{S} in SAMPA), an apostrophe
 --- would be \emph{silently dropped} by the engine's tokenizer. The
 console refuses to let that happen quietly: such symbols are shown struck
