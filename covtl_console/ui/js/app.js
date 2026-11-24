@@ -43,6 +43,9 @@ const state = {
   outputMode: 'audio',
   displayPolar: true,
   displaySpec: true,
+  displaySchwaRoute: false,   // polar display toggle (schwa audit 2026-11-24):
+                              // routed dep→@→arr legs in the drawn trajectory;
+                              // default OFF = legacy direct arc. Display-only.
   exports: false,
   outDir: 'out',
   outLabel: '',
@@ -82,6 +85,7 @@ async function init() {
     getTimings: () => state.timings,
     getGuardPolicy: () => state.guardPolicy,
     getLang: () => state.lang,
+    getDisplaySchwaRoute: () => state.displaySchwaRoute,
     getPreviewFinal: () => finalSampaOf(),
     onSendToInput: (sampa) => useInPhoneticInput(sampa),
     onSeekSegment: (idx) => seekSegment(idx),
@@ -204,6 +208,7 @@ function saveSettings() {
     sandhi: state.sandhi, sandhiMode: state.sandhiMode,
     guardPolicy: state.guardPolicy, outputMode: state.outputMode,
     displayPolar: state.displayPolar, displaySpec: state.displaySpec,
+    displaySchwaRoute: state.displaySchwaRoute,
     exports: state.exports, outDir: state.outDir, outLabel: state.outLabel,
     sources: state.sources,
   };
@@ -218,7 +223,7 @@ function loadSettings() {
     if (s.speaker) state.speaker = s.speaker;
     if (s.f0) { state.f0 = s.f0; state.f0Edited = true; }
     if (s.timings) { state.timings = s.timings; state.customTimings = true; }
-    for (const k of ['expressive', 'engine', 'ortho', 'outputMode', 'displayPolar', 'displaySpec', 'exports', 'outDir', 'outLabel', 'sandhi', 'sandhiMode', 'phonation']) {
+    for (const k of ['expressive', 'engine', 'ortho', 'outputMode', 'displayPolar', 'displaySpec', 'displaySchwaRoute', 'exports', 'outDir', 'outLabel', 'sandhi', 'sandhiMode', 'phonation']) {
       if (s[k] !== undefined && s[k] !== null) state[k] = s[k];
     }
     if (s.guardPolicy) state.guardPolicy = s.guardPolicy;
@@ -363,6 +368,15 @@ function bindControls() {
     saveSettings();
   });
   $('#chk-exports').addEventListener('change', (e) => { state.exports = e.target.checked; saveSettings(); });
+  $('#chk-schwa-route').addEventListener('change', (e) => {
+    // Display-only toggle (schwa audit 2026-11-24): the routed
+    // dep → @ → arr legs are drawn by the NEXT Compile / Synthesize
+    // payload; a loaded payload is not re-routed client-side. Audio
+    // and the engine routing (mandatory, unconditional) never change.
+    state.displaySchwaRoute = e.target.checked;
+    saveSettings();
+    R.log(`schwa routing display ${state.displaySchwaRoute ? 'ON' : 'OFF'} — applies to the next compile / synthesis payload`);
+  });
   $$('input[name="outmode"]').forEach((r) => r.addEventListener('change', (e) => {
     state.outputMode = e.target.value;
     saveSettings();
@@ -484,6 +498,7 @@ function applyStateToControls() {
   $('#chk-ortho').checked = state.ortho;
   $('#chk-polar-display').checked = state.displayPolar;
   $('#chk-spec').checked = state.displaySpec;
+  $('#chk-schwa-route').checked = state.displaySchwaRoute;
   $('#chk-exports').checked = state.exports;
   $(`input[name="outmode"][value="${state.outputMode}"]`).checked = true;
   $('#out-dir').value = state.outDir;
@@ -972,6 +987,7 @@ function synthPayload(source) {
     exports: state.exports,
     phonation: state.phonation,
     sandhi: state.sandhi, sandhiMode: state.sandhiMode,
+    display_schwa_route: state.displaySchwaRoute,
     _via: via,
     _src: info.which,
   };

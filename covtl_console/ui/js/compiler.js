@@ -244,6 +244,7 @@ export class SyllableCompiler {
         text: src, lang: this.opts.getLang(),
         timings: this.opts.getTimings(),
         guardPolicy: this.opts.getGuardPolicy(),
+        displaySchwaRoute: this.opts.getDisplaySchwaRoute?.() ?? false,
       });
       if (seq !== this._seq) return;            // a newer compile superseded this one
       if (text !== undefined) this.input.value = src;

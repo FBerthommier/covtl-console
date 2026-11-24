@@ -46,13 +46,15 @@ function cacheSet(map, key, value, max) {
 }
 
 export function synthCacheKey(p) {
-  /* mirrors the server-side key: everything that changes the audio,
-     guard policy deliberately excluded (see header comment). */
+  /* mirrors the server-side key: everything that changes the audio —
+     and the .polar display payload (display_schwa_route, schwa audit
+     2026-11-24) — guard policy deliberately excluded (header comment). */
   return JSON.stringify([
     p.text, p.mode, p.lang, p.speaker, p.f0,
     [p.timings.tcons, p.timings.tvoy, p.timings.tpause, p.timings.tpauseLong],
     p.expressive, p.engine, p.ortho, p.outputMode, p.exports ?? true, p.label ?? null, p.outputDir ?? 'out',
     p.sandhi ?? 'off', p.sandhiMode ?? 'g2p',
+    p.display_schwa_route ?? false,
   ]);
 }
 
@@ -222,9 +224,11 @@ export const api = {
   },
 
   /* ── syllable block compiler — the structural half, never synthesizes ── */
-  async compile({ text, lang = 'en', timings = {}, guardPolicy = 'warn' }) {
+  async compile({ text, lang = 'en', timings = {}, guardPolicy = 'warn',
+                  displaySchwaRoute = false }) {
     const key = JSON.stringify([text, lang, timings.tcons, timings.tvoy,
-                                timings.tpause, timings.tpauseLong]);
+                                timings.tpause, timings.tpauseLong,
+                                displaySchwaRoute]);
     const hit = compileCache.get(key);
     if (hit) {
       cacheStats.compileHits += 1;
@@ -240,7 +244,8 @@ export const api = {
     {
       const r = await jfetch('/api/compile', {
         method: 'POST',
-        body: JSON.stringify({ text, lang, timings, guard_policy: guardPolicy }),
+        body: JSON.stringify({ text, lang, timings, guard_policy: guardPolicy,
+                               display_schwa_route: displaySchwaRoute }),
       }, 20000);
       out = {
         source: r.source, sampa: r.sampa,

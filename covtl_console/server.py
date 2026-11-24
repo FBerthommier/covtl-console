@@ -138,6 +138,41 @@ def sandhi_capability() -> Dict[str, Any]:
             "modes": list(SANDHI.SANDHI_MODES),
             "languages": sorted(SANDHI.SANDHI_LANGS)}
 
+
+# Schwa display toggle (schwa audit 2026-11-24) — guarded capability
+# probe, same pattern as SANDHI above. The display_schwa_route flag
+# (routed dep→@→arr legs in the .polar plane) exists on the engine main
+# AFTER the audit; engines <= 1.2.2 PyPI do not accept it. The toggle is
+# DISPLAY-ONLY by contract: when the installed engine predates it, the
+# request degrades to the legacy direct arc with an explicit warning —
+# never an error, never an audio change.
+def _schwa_toggle_supported() -> bool:
+    try:
+        import inspect
+        from vtl_synth.video.polar_video import build_polar as _bp
+        return "display_schwa_route" in inspect.signature(_bp).parameters
+    except Exception:
+        return False
+
+
+SCHWA_TOGGLE = _schwa_toggle_supported() if LIVE else False
+
+
+def _resolve_schwa_route(req, warnings: List[str],
+                         notes: Optional[List[str]] = None) -> bool:
+    """Requested schwa display toggle, resolved against the ENGINE
+    capability (never a hard failure): requested-but-unsupported
+    degrades to the legacy direct arc with an explicit message."""
+    wanted = bool(getattr(req, "display_schwa_route", False))
+    if wanted and not SCHWA_TOGGLE:
+        msg = ("display_schwa_route ignored: the installed engine "
+               f"({ENGINE_VERSION}) predates the schwa display toggle "
+               "(schwa audit 2026-11-24) — the legacy direct arc is drawn")
+        (notes if notes is not None else warnings).append(msg)
+        return False
+    return wanted
+
+
 SPEAKERS = [
     {"id": "jd3", "name": "JD3", "origin": "reference (SynthVTL24b original)", "f0": 102.216},
     {"id": "s1",  "name": "S1",  "origin": "DVTD MRI subject 1 (male), calibrated v3", "f0": 114.908},
@@ -853,6 +888,10 @@ class CompileRequest(BaseModel):
     expressive: bool = False             # accepted for key symmetry; breath via '%'
     sandhi: str = "off"                  # accepted for symmetry; SAMPA has no
     sandhi_mode: str = "g2p"             #   orthography — a level yields a warning
+    display_schwa_route: bool = False    # polar display toggle (schwa audit
+                                         # 2026-11-24): routed dep→@→arr legs in
+                                         # the .polar plane; default OFF = legacy
+                                         # direct arc. Display-only — never audio.
 
 
 class SynthRequest(BaseModel):
@@ -873,6 +912,10 @@ class SynthRequest(BaseModel):
     exports: bool = True                 # keep tract/polar/txt offered as downloads
     sandhi: str = "off"                  # cross-word sandhi level (covtl-sandhi)
     sandhi_mode: str = "g2p"
+    display_schwa_route: bool = False    # polar display toggle (schwa audit
+                                         # 2026-11-24): routed dep→@→arr legs in
+                                         # the .polar plane; default OFF = legacy
+                                         # direct arc. Display-only — never audio.
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -953,11 +996,14 @@ def _apply_sandhi_ortho(req: PreviewRequest, text: str, level: str,
 
 
 def synth_key(req: SynthRequest) -> str:
-    """Cache key over the parameters that change the produced audio.
-    guardPolicy is deliberately excluded: warn/off yield identical audio and
-    the error policy is re-validated on every hit (see synthesize()).
-    The engine version is included — an engine upgrade invalidates entries
-    rather than serving old-engine audio (brief §11.1)."""
+    """Cache key over the parameters that change the produced audio —
+    and the produced .polar display (display_schwa_route, schwa audit
+    2026-11-24: same audio but a different drawn trajectory, so two
+    flag states must not share a job). guardPolicy is deliberately
+    excluded: warn/off yield identical audio and the error policy is
+    re-validated on every hit (see synthesize()). The engine version is
+    included — an engine upgrade invalidates entries rather than
+    serving old-engine audio (brief §11.1)."""
     payload = {
         "engine_version": ENGINE_VERSION,
         "text": req.text, "mode": req.mode, "lang": req.lang,
@@ -970,6 +1016,7 @@ def synth_key(req: SynthRequest) -> str:
         "label": req.label, "outputDir": req.outputDir,
         "sandhi": str(req.sandhi or "off").lower(),
         "sandhi_mode": str(req.sandhi_mode or "g2p").lower(),
+        "display_schwa_route": bool(getattr(req, "display_schwa_route", False)),
     }
     blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()
@@ -1344,7 +1391,8 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
                          hint="Start the bridge on a machine with covtl-pipeline installed.")
     key = (req.text, req.lang, json.dumps(req.timings, sort_keys=True),
            str(req.sandhi or "off").lower(),
-           str(req.sandhi_mode or "g2p").lower())
+           str(req.sandhi_mode or "g2p").lower(),
+           bool(getattr(req, "display_schwa_route", False)))
     hit = COMPILE_CACHE.get(key)
     if hit is not None:
         COMPILE_CACHE.move_to_end(key)
@@ -1427,7 +1475,9 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
         phrases = [_normalize_ipa(_normalize_word(ph)) for ph in _phrases_of(src)]
         polar_data = build_polar(phrases, t_cons=tc, t_voy=tv,
                                  pause_short_ms=t["tpause"],
-                                 pause_long_ms=t["tpauseLong"])
+                                 pause_long_ms=t["tpauseLong"],
+                                 display_schwa_route=_resolve_schwa_route(
+                                     req, warnings))
         doc = {
             "n_steps": polar_data["n_steps"],
             "inventory": polar_data["inventory"],
@@ -1660,6 +1710,11 @@ def _run_stage2(payload: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
     """
     global _SYNTH_POOL_BROKEN
     from covtl_console import _synthproc
+    from concurrent.futures.process import BrokenProcessPool   # [XFIX] the
+    # handler below needs the name in THIS scope (3.1.4 shipped a latent
+    # NameError here: the import in _synth_pool() was function-local, so a
+    # real worker death surfaced as "name 'BrokenProcessPool' is not
+    # defined" instead of the fallback path)
     pool = _synth_pool()
     if pool is not None:
         try:
@@ -1803,7 +1858,10 @@ def _worker(job_id: str, req: SynthRequest,
                 t_voy = max(1, round(t["tvoy"] / 10.0))
                 polar_data = build_polar(_phrases_of(sampa), t_cons=t_cons, t_voy=t_voy,
                                          pause_short_ms=t["tpause"],
-                                         pause_long_ms=t["tpauseLong"])
+                                         pause_long_ms=t["tpauseLong"],
+                                         display_schwa_route=_resolve_schwa_route(
+                                             req, warnings,
+                                             notes=job.setdefault("notes", [])))
                 write_polar(polar_path, polar_data)
                 job.setdefault("paths", {})["polar"] = str(polar_path)
                 job["polar_ready"] = True
@@ -1845,6 +1903,10 @@ def _worker(job_id: str, req: SynthRequest,
             "label": safe_label,
             "polar": req.outputMode == "polar",
             "sampa_guard": req.guardPolicy,
+            # resolved against the engine capability; degradation lands in
+            # the job notes (the visible channel for synthesis jobs)
+            "display_schwa_route": _resolve_schwa_route(
+                req, warnings, notes=job.setdefault("notes", [])),
         }
         result = _run_stage2(payload, job)
         stop.set()
