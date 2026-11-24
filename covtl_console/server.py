@@ -173,6 +173,21 @@ def _resolve_schwa_route(req, warnings: List[str],
     return wanted
 
 
+def _polar_schwa_kwargs(req, warnings: List[str],
+                        notes: Optional[List[str]] = None) -> dict:
+    """display_schwa_route kwarg for the engine's build_polar, passed
+    ONLY when the installed builder accepts it (the same conditional as
+    _synthproc.run_synthesis forwards to Pipeline.run): engines
+    <= 1.2.2 PyPI predate the parameter entirely, so an unconditional
+    kwarg would raise TypeError and break the early polar stage. The
+    resolution still runs, leaving the degradation message when the
+    engine predates the toggle."""
+    route = _resolve_schwa_route(req, warnings, notes)
+    if not SCHWA_TOGGLE:
+        return {}
+    return {"display_schwa_route": route}
+
+
 SPEAKERS = [
     {"id": "jd3", "name": "JD3", "origin": "reference (SynthVTL24b original)", "f0": 102.216},
     {"id": "s1",  "name": "S1",  "origin": "DVTD MRI subject 1 (male), calibrated v3", "f0": 114.908},
@@ -1476,8 +1491,7 @@ def compile_blocks(req: CompileRequest) -> Dict[str, Any]:
         polar_data = build_polar(phrases, t_cons=tc, t_voy=tv,
                                  pause_short_ms=t["tpause"],
                                  pause_long_ms=t["tpauseLong"],
-                                 display_schwa_route=_resolve_schwa_route(
-                                     req, warnings))
+                                 **_polar_schwa_kwargs(req, warnings))
         doc = {
             "n_steps": polar_data["n_steps"],
             "inventory": polar_data["inventory"],
@@ -1859,7 +1873,7 @@ def _worker(job_id: str, req: SynthRequest,
                 polar_data = build_polar(_phrases_of(sampa), t_cons=t_cons, t_voy=t_voy,
                                          pause_short_ms=t["tpause"],
                                          pause_long_ms=t["tpauseLong"],
-                                         display_schwa_route=_resolve_schwa_route(
+                                         **_polar_schwa_kwargs(
                                              req, warnings,
                                              notes=job.setdefault("notes", [])))
                 write_polar(polar_path, polar_data)
