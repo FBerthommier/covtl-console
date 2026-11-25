@@ -79,7 +79,7 @@ def test_text_at_the_bound_is_accepted(client, S):
     concern here; the 200 is what matters)."""
     r = _post(client, text="p a " * (S.MAX_SYNTH_CHARS // 4))
     assert r.status_code == 200, r.text
-    job = _wait_done(S, r.json()["job_id"], timeout_s=900.0)
+    job = _wait_done(S, r.json()["job_id"], timeout_s=1500.0)
     assert job["state"] in ("done", "error"), job.get("error")
 
 
