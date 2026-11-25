@@ -22,7 +22,7 @@ on:
       version:
         description: 'covtl-console version to install from PyPI'
         required: true
-        default: '3.1.10'
+        default: '3.1.12'
   push:
     branches: [main]
     paths:
@@ -53,7 +53,7 @@ jobs:
           # pins = the current coherent PyPI chain; bump these three
           # lines together when publishing the next versions
           python -m pip install "fastapi" "uvicorn" numpy scipy Pillow imageio-ffmpeg cmudict "vocaltractlab-cython>=0.0.10" matplotlib pyinstaller
-          python -m pip install --no-deps "covtl-console==${{ inputs.version || '3.1.10' }}" "covtl-synth==1.2.2" "covtl-sandhi==0.1.1"
+          python -m pip install --no-deps "covtl-console==${{ inputs.version || '3.1.12' }}" "covtl-synth==1.2.3" "covtl-sandhi==0.1.1"
 
       - name: pip check
         shell: pwsh
@@ -123,7 +123,7 @@ jobs:
           $sha = (Get-Content sha.txt) -replace 'sha=', ''
           gh release delete windows-standalone --yes --cleanup-tag || $true
           gh release create windows-standalone `
-            --title "COVTL Console — standalone Windows x64 (${{ inputs.version || '3.1.10' }})" `
+            --title "COVTL Console — standalone Windows x64 (${{ inputs.version || '3.1.12' }})" `
             --notes "Automated build (PyInstaller onedir, Python 3.12, smoke on a copy with synthesis + polar MP4). ASCII %TEMP% staging for non-ASCII install paths; Linux twin: release linux-standalone. sha256: $sha" `
             --latest `
             COVTL-Console-Windows-x64.zip#COVTL-Console-Windows-x64.zip
