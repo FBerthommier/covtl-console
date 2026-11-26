@@ -3,7 +3,7 @@
 
 # COVTL Console v3 — Change Record
 
-## v3.1.13 — 2026-11-26
+## v3.1.14 — 2026-11-26 (supersedes 3.1.13: its metadata required covtl-synth==1.2.3)
 
 - Version pin release: covtl-synth 1.2.4 (polar display v6/v7 — branchement on the full departure vowel, cos^2 leg sampling, mirrored release-leg phase; soft rectification of closing VV arcs, audit C), docs campaign sync-audit-2026-11-23, didactic manual 2nd edition.
 - test_schwa_route.py rewritten for the rectified engine semantics (display toggle mirrors the engine treatment).
