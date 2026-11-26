@@ -53,7 +53,7 @@ jobs:
           # pins = the current coherent PyPI chain; bump these three
           # lines together when publishing the next versions
           python -m pip install "fastapi" "uvicorn" numpy scipy Pillow imageio-ffmpeg cmudict "vocaltractlab-cython>=0.0.10" matplotlib pyinstaller
-          python -m pip install --no-deps "covtl-console==${{ inputs.version || '3.1.12' }}" "covtl-synth==1.2.3" "covtl-sandhi==0.1.1"
+          python -m pip install --no-deps "covtl-console==${{ inputs.version || '3.1.13' }}" "covtl-synth==1.2.4" "covtl-sandhi==0.1.1"
 
       - name: pip check
         shell: pwsh
