@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "covtl-console"
-version = "3.1.12"
+version = "3.1.13"
 description = "COVTL Lab Console — local web interface for covtl-pipeline (G2P preview, SAMPA guard, syllable compiler, continuous polar display)"
 readme = "README.md"
 requires-python = ">=3.9"
