@@ -1,15 +1,23 @@
 """Console plumbing of the display_schwa_route toggle (schwa audit
-2026-11-24).
+2026-11-24, rectification audit 2026-11-26).
 
 The toggle is DISPLAY-ONLY by contract: the payload is accepted by
 CompileRequest / SynthRequest (default False), forwarded to the engine's
 polar builder, cached separately per flag state, and never changes the
-audio or the engine routing (which is mandatory and unconditional).
+audio or the engine treatment (which is unconditional).
 
-  - ON: the compiled polar payload draws the routed dep → @ → arr legs —
-    the vocalic trajectory passes through the schwa waypoint, whose
-    payload coordinates are theta_v = 270 (display degrees of the π
-    meridian) at rho_v = 0.580 / rho_max.
+Since the 2026-11-26 engine audit, closing VV arcs (« buib », u→i) keep
+their DIRECT path with a probe-tuned TCY/TBY rectification toward the
+schwa values — the two-leg dep → @ → arr routing survives only as the
+engine FALLBACK (when no rectification amplitude opens the corridor):
+
+  - ON, nominal (rectified arc): the compiled polar payload draws the
+    direct family arc — no π crossing (theta_v = 270 display degrees),
+    same as OFF. The rectification stays below polar-path resolution.
+  - ON, fallback (engine forced with a closing stub): the routed
+    dep → @ → arr legs — the vocalic trajectory passes through the
+    schwa waypoint, whose payload coordinates are theta_v = 270
+    (display degrees of the π meridian) at rho_v = 0.580 / rho_max.
   - OFF (default): the legacy direct arc — no π crossing (the direct
     u→i chord sweeps through 0°, display 90°).
 
@@ -69,13 +77,34 @@ def test_synth_cache_key_separates_toggle():
     assert k_off != k_on
 
 
-def test_compile_polar_routed_when_on():
+def test_compile_polar_rectified_when_on():
+    """ON, nominal: the rectified arc (audit 2026-11-26) stays on the
+    direct family path — no π crossing, like OFF (the TCY/TBY
+    rectification is below polar-path resolution)."""
     if not _schwa_toggle_known():
         pytest.skip("engine predates the schwa display toggle")
     r = server.compile_blocks(server.CompileRequest(
         text="buib", lang="en", display_schwa_route=True))
+    assert _rho_at_pi_crossing(r["polar"]) is None, \
+        "rectified display keeps the direct family arc (no pi crossing)"
+
+
+def test_compile_polar_fallback_route_when_on(monkeypatch):
+    """ON, fallback: an always-closing probe forces the two-leg
+    routing — the trajectory passes exactly through the schwa
+    waypoint (rho 0.580 at the π meridian, display 270°)."""
+    if not _schwa_toggle_known():
+        pytest.skip("engine predates the schwa display toggle")
+    from vtl_synth.video import polar_video as pv
+
+    def _closing_probe(block):
+        return 0.0
+
+    monkeypatch.setattr(pv, '_vv_probe', lambda: _closing_probe)
+    r = server.compile_blocks(server.CompileRequest(
+        text="buib", lang="en", display_schwa_route=True))
     rho = _rho_at_pi_crossing(r["polar"])
-    assert rho is not None, "routed display must pass through pi/270"
+    assert rho is not None, "fallback routing must pass through pi/270"
     # payload rho is normalized by rho_max (>= 1.45); the waypoint radius
     # 0.580 lands at 0.580 / rho_max — compare against the payload's own
     # normalization
